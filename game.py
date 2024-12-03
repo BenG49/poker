@@ -85,9 +85,9 @@ class Player(ABC):
 class Game:
 	def __init__(self, buy_in: int, bigblind: int = 2):
 		# game state
-		self.buy_in: int = buy_in
-		self.bigblind: int = bigblind
-		self.smlblind: int = bigblind // 2
+		self.__buy_in: int = buy_in
+		self.__bigblind: int = bigblind
+		self.__smlblind: int = bigblind // 2
 
 		# game state
 		self.button: int = 0
@@ -149,8 +149,8 @@ class Game:
 			small = self.pl_left(self.button)
 			big = self.pl_left(self.button, 2)
 		
-		self.pldata[small].bet(self.smlblind)
-		self.pldata[big].bet(self.bigblind)
+		self.pldata[small].bet(self.small_blind)
+		self.pldata[big].bet(self.big_blind)
 
 		# deal hands
 		shuffle(self.__deck)
@@ -196,6 +196,20 @@ class Game:
 			for winner in winners:
 				self.pldata[winner].chips += win_value
 	
+	### GETTERS ###
+
+	@property
+	def buy_in(self) -> int:
+		return self.__buy_in
+	
+	@property
+	def big_blind(self) -> int:
+		return self.__bigblind
+	
+	@property
+	def small_blind(self) -> int:
+		return self.__smlblind
+
 	### MODIFIERS ###
 	
 	def add_player(self, player: Player):
