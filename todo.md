@@ -1,4 +1,3 @@
-- make buy in constant
 - clean up util.Hand.\_\_init\_\_
 - add more to public api of Game
 - add comprehensive tester

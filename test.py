@@ -36,21 +36,27 @@ class TestHand(unittest.TestCase):
 
 class TestGame(unittest.TestCase):
 	def test_player_data(self):
-		game = Game()
-		game.add_player(bots.Raiser(2), 200)
-		game.add_player(bots.Checker(), 150)
-		game.add_player(bots.Folder(), 100)
-		game.add_player(bots.AllIn(), 50)
+		game = Game(200)
+		game.add_player(bots.Raiser(2))
+		game.add_player(bots.Checker())
+		game.pldata[-1].chips = 150
+		game.add_player(bots.Folder())
+		game.pldata[-1].chips = 100
+		game.add_player(bots.AllIn())
+		game.pldata[-1].chips = 50
 		self.assertEqual(len(game.pldata), 4)
 
 		self.assertEqual(list(map(lambda x: x.chips, game.pldata)), [200, 150, 100, 50])
 	
 	def test_side_hand(self):
-		game = Game()
-		game.add_player(bots.Raiser(2), 200)
-		game.add_player(bots.Checker(), 150)
-		game.add_player(bots.Folder(), 100)
-		game.add_player(bots.AllIn(), 50)
+		game = Game(200)
+		game.add_player(bots.Raiser(2))
+		game.add_player(bots.Checker())
+		game.pldata[-1].chips = 150
+		game.add_player(bots.Folder())
+		game.pldata[-1].chips = 100
+		game.add_player(bots.AllIn())
+		game.pldata[-1].chips = 50
 		random.seed(27)
 		game.step_hand()
 
@@ -88,10 +94,12 @@ class TestGame(unittest.TestCase):
 	
 	# test multiple side pots (two all in with different values)
 	def test_side_hands(self):
-		game = Game()
-		game.add_player(bots.AllIn(), 10)
-		game.add_player(bots.AllIn(), 20)
-		game.add_player(bots.AllIn(), 100)
+		game = Game(100)
+		game.add_player(bots.AllIn())
+		game.pldata[-1].chips = 10
+		game.add_player(bots.AllIn())
+		game.pldata[-1].chips = 20
+		game.add_player(bots.AllIn())
 		random.seed(107)
 		game.step_hand()
 
@@ -113,10 +121,12 @@ class TestGame(unittest.TestCase):
 
 	# test bet higher than another player's chips, then all in
 	def test_side_hands2(self):
-		game = Game()
-		game.add_player(bots.AllIn(), 20)
-		game.add_player(bots.AllIn(), 10)
-		game.add_player(bots.AllIn(), 100)
+		game = Game(100)
+		game.add_player(bots.AllIn())
+		game.pldata[-1].chips = 20
+		game.add_player(bots.AllIn())
+		game.pldata[-1].chips = 10
+		game.add_player(bots.AllIn())
 		random.seed(107)
 		game.step_hand()
 

@@ -83,8 +83,9 @@ class Player(ABC):
 		return Hand.get_highest_hand(*game.community, *pl_hand)
 
 class Game:
-	def __init__(self, bigblind: int = 2):
+	def __init__(self, buy_in: int, bigblind: int = 2):
 		# game state
+		self.buy_in: int = buy_in
 		self.bigblind: int = bigblind
 		self.smlblind: int = bigblind // 2
 
@@ -197,8 +198,8 @@ class Game:
 	
 	### MODIFIERS ###
 	
-	def add_player(self, player: Player, chips: int):
-		self.pldata.append(PlayerData(chips, 0))
+	def add_player(self, player: Player):
+		self.pldata.append(PlayerData(self.buy_in, 0))
 		self.__players.append(player)
 
 	def __burn_card(self):
