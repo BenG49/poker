@@ -1,0 +1,7 @@
+- make buy in constant
+- clean up util.Hand.\_\_init\_\_
+- add more to public api of Game
+- add comprehensive tester
+- bot testing suite
+	- inputs: player count
+	- play n by n, grid of average ending value, + or - from buy in
