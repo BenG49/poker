@@ -43,7 +43,7 @@ Turn options (others):
 - Usually constant
 - In tournaments, blinds increase over time
 
-All-in:
+~~All-in~~:
 - Player has no more remaining to bet
 
 ~~Side pots~~:
