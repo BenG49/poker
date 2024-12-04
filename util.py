@@ -1,3 +1,6 @@
+'''
+Utility classes Suit, Rank, Card, Hand
+'''
 from dataclasses import dataclass
 from enum import IntEnum, StrEnum
 from typing import List, Iterable
@@ -31,6 +34,7 @@ class Rank(IntEnum):
     KING = 13
     ACE = 14
 
+    @staticmethod
     def from_str(s: str):
         return '  23456789TJQKA'.index(s)
 
@@ -42,9 +46,11 @@ class Card:
     rank: Rank
     suit: Suit
 
+    @staticmethod
     def gen_deck():
         return [Card(Rank(r), Suit(s)) for s in '♠♥♦♣' for r in [Rank.ACE] + list(range(Rank.TWO, Rank.ACE))]
 
+    @staticmethod
     def make(s: str):
         assert len(s) == 2
         return Card(Rank.from_str(s[0]), Suit(s[1]))
@@ -62,6 +68,7 @@ class Card:
 
 # only stores hand value and representation, not actual hand data!
 class Hand:
+    @staticmethod
     def get_highest_hand(*cards: List[Card]):
         assert len(cards) == 7
 
@@ -86,7 +93,7 @@ class Hand:
 
         cards.sort(key=Card.get_rank)
         ranks = list(map(Card.get_rank, cards))
-        
+
         primary_indicies = list(range(5))
         low_ace = False
 
@@ -142,13 +149,13 @@ class Hand:
 
         primary_rank = create_rank_value([ranks[i] for i in primary_indicies])
         secondary_rank = create_rank_value([ranks[i] for i in range(5) if i not in primary_indicies])
-        
+
         # hand type:       4 bits
         # primary rank:   14 bits
         # secondary rank: 14 bits
         self.value = (hand_type << 28) | (primary_rank << 14) | secondary_rank
         self.string = str(cards)
-    
+
     def __gt__(self, other) -> bool:
         return self.value > other.value
 

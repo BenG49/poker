@@ -1,3 +1,6 @@
+'''
+Unit testing for util.py and game.py
+'''
 import unittest
 import random
 
@@ -88,7 +91,7 @@ class TestGame(unittest.TestCase):
         # player 3 and player 0 tie
 
         self.assertEqual(list(map(lambda x: x.chips, game.pldata)), [232, 94, 98, 76])
-    
+
     # test multiple side pots (two all in with different values)
     # preflop
     #     bets: 10, 20, 100

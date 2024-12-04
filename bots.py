@@ -1,3 +1,6 @@
+'''
+Stores all poker bots
+'''
 from typing import List
 
 from game import Game, Player, FOLD, RIVER
@@ -11,7 +14,7 @@ class Raiser(Player):
         if game.betting_round() == RIVER:
             print(Player.own_best_hand(game, pl_hand))
 
-        return max(max(game.bets()), self.min_raise) - Player.own_data(game, pl_id).live_bet
+        return max([self.min_raise, *game.bets()]) - Player.own_data(game, pl_id).live_bet
 
 class Checker(Player):
     def move(self, game: Game, pl_hand: List[Card], pl_id: int):
