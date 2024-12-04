@@ -127,20 +127,23 @@ class Game:
     '''Game'''
     def __init__(self, buy_in: int, bigblind: int = 2):
         # game state
-        self.__buy_in: int = buy_in
-        self.__bigblind: int = bigblind
-        self.__smlblind: int = bigblind // 2
+        self.buy_in: int = buy_in
+        self.big_blind: int = bigblind
+        self.small_blind: int = bigblind // 2
 
         # game state
-        self.button: int = 0
+        self.button_id: int = 0
+        self.sb_id: int = 0
+        self.bb_id: int = 0
+
         self.current_pl_id: int = 0
         self.pl_data: List[PlayerData] = []
         self.community: List[Card] = []
         self.pots: List[Pot] = [Pot(0, {})]
 
         ### PRIVATE ###
-        self.__players: List[Player] = []
-        self.__deck: Deck = Deck()
+        self._players: List[Player] = []
+        self._deck: Deck = Deck()
 
     def __bet(self, pl_id: int, chips: int):
         if self.pl_data[pl_id].chips < chips:
@@ -149,10 +152,12 @@ class Game:
         self.pots[self.pl_data[pl_id].latest_pot].add(pl_id, chips)
 
     def bet_round(self):
-        # start past blinds if first betting round
-        self.current_pl_id = self.pl_left(
-            self.button,
-            3 if self.betting_round() == BettingRound.PREFLOP else 1)
+        self.current_pl_id = self.pl_left(self.bb_id)
+
+        # blinds
+        if self.betting_round() == BettingRound.PREFLOP:
+            self.__bet(self.sb_id, self.small_blind)
+            self.__bet(self.bb_id, self.big_blind)
 
         # give everyone one turn
         for pl in self.active_players():
@@ -161,7 +166,7 @@ class Game:
         # wait until all active players have matched bets
         while len(self.pl_iter(include_states=[PlayerState.TO_CALL])) > 0:
             if self.current_pl_data.state.active():
-                action, amt = self.__players[self.current_pl_id].move(self)
+                action, amt = self._players[self.current_pl_id].move(self)
 
                 if action == Action.FOLD:
                     self.current_pl_pot.fold(self.current_pl_id)
@@ -200,31 +205,27 @@ class Game:
                 self.pl_data[pl].latest_pot += 1
             self.pots.append(split)
 
-    def step_hand(self):
-        assert len(self.__players) > 1
+    def start_hand(self):
+        assert len(self._players) > 1
 
-        # reset
         self.community = []
-        for pl in self.__players:
+        for pl in self._players:
             pl.hand = []
 
-        # blinds
-        if len(self.__players) == 2:
-            small = self.button
-            big = self.pl_left(self.button)
+        if len(self._players) == 2:
+            self.sb_id = self.button_id
         else:
-            small = self.pl_left(self.button)
-            big = self.pl_left(self.button, 2)
-
-        self.__bet(small, self.small_blind)
-        self.__bet(big, self.big_blind)
+            self.sb_id = self.pl_left(self.button_id)
+        self.bb_id = self.pl_left(self.sb_id)
 
         # deal hands
-        self.__deck.shuffle()
+        self._deck.shuffle()
         for _ in range(2):
-            for h in [i % len(self.__players) for i in range(small, small+len(self.__players))]:
-                self.__players[h].hand.append(self.__deck.deal())
-        print('Hands:', list(map(lambda x: x.hand, self.__players)))
+            for h in [(i + self.sb_id) % len(self._players) for i in range(len(self._players))]:
+                self._players[h].hand.append(self._deck.deal())
+
+    def step_hand(self):
+        self.start_hand()
 
         for rnd in iter(BettingRound):
             self.bet_round()
@@ -232,21 +233,17 @@ class Game:
             # check if only one player remaining
             # or showdown
             if len(list(filter(lambda x: x.state.active(), self.pl_data))) == 1 or \
-              rnd == BettingRound.RIVER:
+               rnd == BettingRound.RIVER:
                 self.end_hand()
                 break
 
             # deal
             if rnd != BettingRound.RIVER:
-                self.__deck.burn()
+                self._deck.burn()
                 if rnd == BettingRound.PREFLOP:
-                    self.community.extend(self.__deck.deal(3))
+                    self.community.extend(self._deck.deal(3))
                 else:
-                    self.community.append(self.__deck.deal())
-
-                print('Community:', self.community)
-
-        self.button = self.pl_right(self.button)
+                    self.community.append(self._deck.deal())
 
     def end_hand(self):
         def pl_id(t: Tuple[int, Hand]):
@@ -273,19 +270,9 @@ class Game:
             for winner in winners:
                 self.pl_data[winner].chips += win_value
 
+        self.button_id = self.pl_right(self.button_id)
+
     ### GETTERS ###
-
-    @property
-    def buy_in(self) -> int:
-        return self.__buy_in
-
-    @property
-    def big_blind(self) -> int:
-        return self.__bigblind
-
-    @property
-    def small_blind(self) -> int:
-        return self.__smlblind
 
     @property
     def current_pl_data(self) -> PlayerData:
@@ -319,17 +306,17 @@ class Game:
     def add_player(self, player: Player):
         self.pl_data.append(PlayerData(
             chips=self.buy_in,
-            pl_id=len(self.__players),
+            pl_id=len(self._players),
             latest_pot=len(self.pots) - 1,
             state=PlayerState.TO_CALL))
-        self.__players.append(player)
+        self._players.append(player)
 
     ### NON-MODIFIER UTILS ###
 
     def __get_hand_rankings(self) -> List[Tuple[int, Hand]]:
         return sorted([
-            (i, Hand.get_highest_hand(*self.community, *self.__players[i].hand))
-            for i in range(len(self.__players))
+            (i, Hand.get_highest_hand(*self.community, *self._players[i].hand))
+            for i in range(len(self._players))
             if self.pl_data[i].state != PlayerState.FOLDED
         ], key=lambda x: x[1])
 
@@ -342,7 +329,7 @@ class Game:
         }[len(self.community)]
 
     def pl_left(self, pl_id: int, n: int = 1) -> int:
-        return (pl_id + n) % len(self.__players)
+        return (pl_id + n) % len(self._players)
 
     def pl_right(self, pl_id: int, n: int = 1) -> int:
-        return (pl_id - n) % len(self.__players)
+        return (pl_id - n) % len(self._players)
