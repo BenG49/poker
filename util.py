@@ -88,10 +88,11 @@ class Deck:
     def shuffle(self):
         shuffle(self.deck)
 
-# only stores hand value and representation, not actual hand data!
 class Hand:
+    '''5-card hand class, only stores hand value, not list of Cards'''
     @staticmethod
     def get_highest_hand(*cards: List[Card]):
+        '''Finds highest hand from 7-card list'''
         assert len(cards) == 7
 
         hands = []
