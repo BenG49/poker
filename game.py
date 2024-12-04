@@ -3,92 +3,128 @@ Classes to simulate a Texas Holdem game.
 '''
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from random import shuffle
-from typing import List, Tuple
+from enum import Enum
+from typing import Iterator, List, Dict, Tuple, Optional, Self
 
-from util import same, Card, Hand
-
-FOLD = -1
-
-PREFLOP = 0
-FLOP = 1
-TURN = 2
-RIVER = 3
+from util import Deck, same, Card, Hand
 
 class InvalidMoveError(ValueError): ...
 
+
+class PlayerState(Enum):
+    '''
+    Stores player's state for the current betting round
+
+    TO_CALL: still has to call, check, or raise
+    MOVED:   called, checked, or raised
+    ALL_IN:  went all in
+    FOLDED:  folded
+    '''
+    TO_CALL = 0
+    MOVED = 1
+    ALL_IN = 2
+    FOLDED = 3
+
+    def active(self) -> bool:
+        '''True if player will still make moves in future betting rounds'''
+        return self in (PlayerState.TO_CALL, PlayerState.MOVED)
+
+class Action(Enum):
+    CALL = 0
+    RAISE = 1
+    ALL_IN = 2
+    FOLD = 3
+
+class BettingRound(Enum):
+    PREFLOP = 0
+    FLOP = 1
+    TURN = 2
+    RIVER = 3
+
+# previous round pots should not have any bets, just chips
+# to fold a player, their bet just goes into the pot and they are removed from every pot
 @dataclass
 class Pot:
-    bets: List[int]
-    pl_ids: List[int]
+    # chips in pot from previous betting rounds
+    chips: int
+    # bets in pot from current round { pl_id: chips }
+    bets: Dict[int, int]
+
+    ### MODIFIERS ###
+    def fold(self, pl_id: int):
+        '''Fold pl_id'''
+        self.chips += self.bets.pop(pl_id, 0)
+
+    def collect_bets(self):
+        '''Put all bets in main pot'''
+        for key, val in self.bets.items():
+            self.chips += val
+            self.bets[key] = 0
+
+    def raised(self) -> int:
+        '''The amount the pot has been raised'''
+        return max([0, *self.bets.values()])
+
+    ### GETTERS ###
+    def total(self) -> int:
+        return self.chips + sum(self.bets.values())
 
     def add(self, pl_id: int, chips: int):
-        self.bets[self.pl_ids.index(pl_id)] += chips
+        '''Add chips to pl_id's bet'''
+        self.bets[pl_id] = chips + self.bets.get(pl_id, 0)
 
-    def chips(self) -> int:
-        return sum(self.bets)
+    def chips_to_call(self, pl_id: int) -> int:
+        '''Minimum amount required to call'''
+        return self.raised() - self.bets.get(pl_id, 0)
 
-    # splits pot into side pots and returns list
-    # NOTE: does not differentiate between folding and going all in, has same end effect
-    def split(self) -> List:
-        if same(self.bets):
-            return [self]
-        else:
-            max_stake = min(self.bets)
+    def players(self) -> Iterator[int]:
+        return self.bets.keys()
 
-            next_bets = []
-            next_pl_ids = []
+    def split(self) -> Optional[Self]:
+        '''
+        Splits pot into side pot if bets are not equal, which
+        assumes that the player with the minimum bet is all-in.
+        Should be called at the end of the hand.
+        '''
+        if same(self.bets.values()):
+            return None
 
-            for i, (bet, pl_id) in enumerate(zip(self.bets, self.pl_ids)):
-                if bet == max_stake:
-                    continue
+        max_stake = min(self.bets.values())
+        next_bets = {}
 
-                next_pl_ids.append(pl_id)
-                next_bets.append(bet - max_stake)
-                self.bets[i] = max_stake
+        for pl_id, bet in self.bets.items():
+            if bet == max_stake:
+                continue
 
-            return [self, *Pot(next_bets, next_pl_ids).split()]
+            self.bets[pl_id] = max_stake
+            next_bets[pl_id] = bet - max_stake
+
+        return Pot(0, next_bets)
 
     def __repr__(self) -> str:
         return self.__str__()
     def __str__(self) -> str:
-        return f'${self.chips()} players [{", ".join(map(str, self.pl_ids))}]'
+        return f'(${self.chips} {", ".join(map(lambda x: f"PL{x[0]}:${x[1]}", self.bets.items()))})'
 
 @dataclass
 class PlayerData:
+    '''Public player data'''
     chips: int
-    live_bet: int
-
-    def folded(self) -> bool:
-        return self.live_bet == FOLD
-
-    def active(self) -> bool:
-        return not self.folded() and self.chips > 0
-
-    def bet(self, amt: int):
-        if amt > self.chips:
-            raise InvalidMoveError
-
-        self.chips -= amt
-        self.live_bet += amt
+    pl_id: int
+    latest_pot: int
+    state: PlayerState
 
 class Player(ABC):
-    #  -1: fold
-    #   0: check
-    # etc: bet/call/raise
+    '''Abstract base class for players'''
+    def __init__(self):
+        self.hand = []
+
     @abstractmethod
-    def move(self, game, pl_hand: List[Card], pl_id: int) -> int:
+    def move(self, game) -> Tuple[Action, Optional[int]]:
         ...
 
-    @staticmethod
-    def own_data(game, pl_id: int) -> PlayerData:
-        return game.pldata[pl_id]
-
-    @staticmethod
-    def own_best_hand(game, pl_hand: List[Card]) -> Hand:
-        return Hand.get_highest_hand(*game.community, *pl_hand)
-
 class Game:
+    '''Game'''
     def __init__(self, buy_in: int, bigblind: int = 2):
         # game state
         self.__buy_in: int = buy_in
@@ -97,55 +133,80 @@ class Game:
 
         # game state
         self.button: int = 0
-        self.pldata: List[PlayerData] = []
+        self.current_pl_id: int = 0
+        self.pl_data: List[PlayerData] = []
         self.community: List[Card] = []
-        self.pots: List[Pot] = []
+        self.pots: List[Pot] = [Pot(0, {})]
 
         ### PRIVATE ###
-        self.__hands: List[List[Card]] = []
         self.__players: List[Player] = []
-        self.__deck: List[Card] = Card.gen_deck()
+        self.__deck: Deck = Deck()
+
+    def __bet(self, pl_id: int, chips: int):
+        if self.pl_data[pl_id].chips < chips:
+            raise InvalidMoveError('Cannot put in more chips than available!')
+        self.pl_data[pl_id].chips -= chips
+        self.pots[self.pl_data[pl_id].latest_pot].add(pl_id, chips)
 
     def bet_round(self):
         # start past blinds if first betting round
-        turn_id = self.pl_left(self.button, 3 if self.betting_round() == 0 else 1)
+        self.current_pl_id = self.pl_left(
+            self.button,
+            3 if self.betting_round() == BettingRound.PREFLOP else 1)
+
         # give everyone one turn
-        moved = [False] * len(self.__players)
+        for pl in self.active_players():
+            pl.state = PlayerState.TO_CALL
 
         # wait until all active players have matched bets
-        while not all(moved) or not same([pl.live_bet for pl in self.pldata if pl.active()]):
-            if self.pldata[turn_id].active():
-                move = self.__players[turn_id].move(self, self.__hands[turn_id], turn_id)
+        while len(self.pl_iter(include_states=[PlayerState.TO_CALL])) > 0:
+            if self.current_pl_data.state.active():
+                action, amt = self.__players[self.current_pl_id].move(self)
 
-                self.check_valid_bet(turn_id, move)
+                if action == Action.FOLD:
+                    self.current_pl_pot.fold(self.current_pl_id)
+                    self.current_pl_data.state = PlayerState.FOLDED
 
-                if move == FOLD:
-                    self.pots[-1].add(turn_id, self.pldata[turn_id].live_bet)
-                    self.pldata[turn_id].live_bet = FOLD
-                else:
-                    self.pldata[turn_id].bet(move)
+                elif action == Action.CALL:
+                    to_call = self.current_pl_pot.chips_to_call(self.current_pl_id)
+                    self.__bet(self.current_pl_id, to_call)
+                    self.current_pl_data.state = PlayerState.MOVED
 
-            moved[turn_id] = True
-            turn_id = self.pl_left(turn_id)
+                elif action == Action.RAISE:
+                    to_call = self.current_pl_pot.chips_to_call(self.current_pl_id)
+                    self.__bet(self.current_pl_id, amt + to_call)
+
+                    # make everyone else call this raise
+                    for pl in self.active_players():
+                        pl.state = PlayerState.TO_CALL
+                    self.current_pl_data.state = PlayerState.MOVED
+
+                elif action == Action.ALL_IN:
+                    self.__bet(self.current_pl_id, self.current_pl_data.chips)
+
+                    # make everyone else call this raise
+                    for pl in self.active_players():
+                        pl.state = PlayerState.TO_CALL
+                    self.current_pl_data.state = PlayerState.ALL_IN
+
+            self.current_pl_id = self.pl_left(self.current_pl_id)
 
         # clear remaining bets into most up to date pot
-        for pl_id, p in enumerate(self.pldata):
-            if not p.folded() and p.live_bet > 0:
-                self.pots[-1].add(pl_id, p.live_bet)
-                p.live_bet = 0
-
-        for p in self.pots.pop().split():
-            self.pots.append(p)
+        split = self.pots[-1].split()
+        self.pots[-1].collect_bets()
+        if split is not None:
+            # move all players in last pot to new pot
+            for pl in self.pots[-1].players():
+                self.pl_data[pl].latest_pot += 1
+            self.pots.append(split)
 
     def step_hand(self):
         assert len(self.__players) > 1
 
         # reset
         self.community = []
-        self.pots = [Pot([0]*len(self.__players), range(len(self.__players)))]
-        self.__hands = [[] for _ in self.__players]
-        for p in self.pldata:
-            p.live_bet = 0
+        for pl in self.__players:
+            pl.hand = []
 
         # blinds
         if len(self.__players) == 2:
@@ -155,33 +216,34 @@ class Game:
             small = self.pl_left(self.button)
             big = self.pl_left(self.button, 2)
 
-        self.pldata[small].bet(self.small_blind)
-        self.pldata[big].bet(self.big_blind)
+        self.__bet(small, self.small_blind)
+        self.__bet(big, self.big_blind)
 
         # deal hands
-        shuffle(self.__deck)
+        self.__deck.shuffle()
         for _ in range(2):
-            for h in [i % len(self.__hands) for i in range(small, small+len(self.__hands))]:
-                self.__hands[h].append(self.__deck.pop())
-        print('Hands:', self.__hands)
+            for h in [i % len(self.__players) for i in range(small, small+len(self.__players))]:
+                self.__players[h].hand.append(self.__deck.deal())
+        print('Hands:', list(map(lambda x: x.hand, self.__players)))
 
-        for r in range(4):
+        for rnd in iter(BettingRound):
             self.bet_round()
 
             # check if only one player remaining
             # or showdown
-            if list(map(PlayerData.folded, self.pldata)).count(False) == 1 or \
-              r == 3:
+            if len(list(filter(lambda x: x.state.active(), self.pl_data))) == 1 or \
+              rnd == BettingRound.RIVER:
                 self.end_hand()
                 break
 
             # deal
-            if r != 3:
-                self.__burn_card()
-                for _ in range(3 if r == 0 else 1):
-                    self.community.append(self.__deck.pop())
+            if rnd != BettingRound.RIVER:
+                self.__deck.burn()
+                if rnd == BettingRound.PREFLOP:
+                    self.community.extend(self.__deck.deal(3))
+                else:
+                    self.community.append(self.__deck.deal())
 
-            if r < 3:
                 print('Community:', self.community)
 
         self.button = self.pl_right(self.button)
@@ -194,16 +256,22 @@ class Game:
 
         rankings = self.__get_hand_rankings()
         for pot in self.pots:
-            pot_hands = list(filter(lambda x: pl_id(x) in pot.pl_ids, rankings))
+            pot_hands = list(filter(lambda x: pl_id(x) in pot.players(), rankings))
             winners = [pl_id(pl) for pl in pot_hands if hand(pl) == hand(pot_hands[-1])]
-            win_value = pot.chips() // len(winners)
-            remainder = pot.chips() % len(winners)
+            win_value = pot.total() // len(winners)
+            remainder = pot.total() % len(winners)
 
             if remainder != 0:
                 raise NotImplementedError
 
+            # clear pots
+            pot.chips = 0
+            for pl in pot.players():
+                pot.bets[pl] = 0
+
+            # transfer to winners
             for winner in winners:
-                self.pldata[winner].chips += win_value
+                self.pl_data[winner].chips += win_value
 
     ### GETTERS ###
 
@@ -219,39 +287,59 @@ class Game:
     def small_blind(self) -> int:
         return self.__smlblind
 
+    @property
+    def current_pl_data(self) -> PlayerData:
+        return self.pl_data[self.current_pl_id]
+
+    @property
+    def current_pl_pot(self) -> Pot:
+        return self.pots[self.current_pl_data.latest_pot]
+
+    ### ITERATORS ###
+
+    def pl_iter(
+            self,
+            start=None,
+            include_states=(PlayerState.TO_CALL, PlayerState.MOVED, PlayerState.ALL_IN, PlayerState.FOLDED),
+            exclude_states=()) -> Iterator[PlayerData]:
+        start = self.current_pl_id if start is None else start
+        def in_iter(pl: PlayerData) -> bool:
+            return pl.state in include_states and pl.state not in exclude_states
+        return [
+            self.pl_data[i % len(self.pl_data)] for i in
+            range(start, start + len(self.pl_data))
+            if in_iter(self.pl_data[i % len(self.pl_data)])
+        ]
+
+    def active_players(self) -> Iterator[Player]:
+        return list(filter(lambda p: p.state.active(), self.pl_data))
+
     ### MODIFIERS ###
 
     def add_player(self, player: Player):
-        self.pldata.append(PlayerData(self.buy_in, 0))
+        self.pl_data.append(PlayerData(
+            chips=self.buy_in,
+            pl_id=len(self.__players),
+            latest_pot=len(self.pots) - 1,
+            state=PlayerState.TO_CALL))
         self.__players.append(player)
-
-    def __burn_card(self):
-        self.__deck.insert(0, self.__deck.pop())
 
     ### NON-MODIFIER UTILS ###
 
     def __get_hand_rankings(self) -> List[Tuple[int, Hand]]:
         return sorted([
-            (i, Hand.get_highest_hand(*self.community, *self.__hands[i]))
+            (i, Hand.get_highest_hand(*self.community, *self.__players[i].hand))
             for i in range(len(self.__players))
-            if not self.pldata[i].folded()
+            if self.pl_data[i].state != PlayerState.FOLDED
         ], key=lambda x: x[1])
 
-    def betting_round(self) -> int:
-        return {0: 0, 3: 1, 4: 2, 5: 3}[len(self.community)]
-
-    def check_valid_bet(self, pl_id: int, bet: int):
-        if bet == FOLD: return
-        # all in
-        if bet == self.pldata[pl_id].chips: return
-
-        if bet > self.pldata[pl_id].chips:
-            raise InvalidMoveError(f'Attempting to bet {bet} chips with only {self.pldata[pl_id].chips} available!')
-        elif self.pldata[pl_id].live_bet + bet < max(self.bets()):
-            raise InvalidMoveError('Bet too little to match current bet')
-
-    def bets(self) -> List[int]:
-        return list(map(lambda pl: pl.live_bet, self.pldata))
+    def betting_round(self) -> BettingRound:
+        return {
+            0: BettingRound.PREFLOP,
+            3: BettingRound.FLOP,
+            4: BettingRound.TURN,
+            5: BettingRound.RIVER
+        }[len(self.community)]
 
     def pl_left(self, pl_id: int, n: int = 1) -> int:
         return (pl_id + n) % len(self.__players)

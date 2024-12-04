@@ -3,6 +3,7 @@ Utility classes Suit, Rank, Card, Hand
 '''
 from dataclasses import dataclass
 from enum import IntEnum, StrEnum
+from random import shuffle
 from typing import List, Iterable
 
 def same(it: Iterable) -> bool:
@@ -47,10 +48,6 @@ class Card:
     suit: Suit
 
     @staticmethod
-    def gen_deck():
-        return [Card(Rank(r), Suit(s)) for s in '♠♥♦♣' for r in [Rank.ACE] + list(range(Rank.TWO, Rank.ACE))]
-
-    @staticmethod
     def make(s: str):
         assert len(s) == 2
         return Card(Rank.from_str(s[0]), Suit(s[1]))
@@ -65,6 +62,31 @@ class Card:
         return self.__str__()
     def __str__(self) -> str:
         return Rank(self.rank).to_str() + str(self.suit)
+
+class Deck:
+    def __init__(self):
+        ranks = [Rank.ACE] + list(range(Rank.TWO, Rank.ACE))
+        self.deck = [Card(Rank(r), Suit(s)) for s in '♠♥♦♣' for r in ranks]
+
+    def deal(self, n: int=1):
+        assert n >= 1
+
+        if n == 1:
+            return self.deck.pop()
+
+        out = self.deck[-n:]
+        self.deck = self.deck[:-n]
+        return out
+
+    def put_back(self, card: Card):
+        self.deck.insert(0, card)
+
+    def burn(self, n=1):
+        for _ in range(n):
+            self.put_back(self.deal())
+
+    def shuffle(self):
+        shuffle(self.deck)
 
 # only stores hand value and representation, not actual hand data!
 class Hand:

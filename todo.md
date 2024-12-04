@@ -1,15 +1,18 @@
 - clean up util.Hand.\_\_init\_\_
-- improve pot processing
-	- each player should store last pot
-	- pot method to fold player
-	- split() should only return max one pot
-	- separate current bets and previous rounds amounts
-- improve PlayerState
-	- store player id
-	- store player state (folded, active)
-- improve API of game
-	- instead of just int for move, return move type and value
-	- only game should be passed
+- use more iterator methods
+- ~~separate deck into class~~
+- ~~improve pot processing~~
+	- ~~each player should store last pot~~
+	- ~~pot method to fold player~~
+	- ~~split() should only return max one pot~~
+	- ~~separate current bets and previous rounds amounts~~
+- ~~improve PlayerData~~
+	- ~~store player id~~
+	- ~~store player state (folded, active)~~
+- ~~improve API of game~~
+	- ~~instead of just int for move, return move type and value~~
+	- ~~only game should be passed~~
+- convert from \_\_ to \_ (doesn't need to be strict private)
 - add comprehensive tester
 - bot testing suite
 	- inputs: player count

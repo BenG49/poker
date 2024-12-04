@@ -1,32 +1,24 @@
 '''
 Stores all poker bots
 '''
-from typing import List
-
-from game import Game, Player, FOLD, RIVER
-from util import Card
+from game import Action, Game, Player
 
 class Raiser(Player):
     def __init__(self, min_raise: int):
+        super().__init__()
         self.min_raise = min_raise
 
-    def move(self, game: Game, pl_hand: List[Card], pl_id: int):
-        if game.betting_round() == RIVER:
-            print(Player.own_best_hand(game, pl_hand))
-
-        return max([self.min_raise, *game.bets()]) - Player.own_data(game, pl_id).live_bet
+    def move(self, game: Game):
+        return Action.RAISE, self.min_raise
 
 class Checker(Player):
-    def move(self, game: Game, pl_hand: List[Card], pl_id: int):
-        if game.betting_round() == RIVER:
-            print(Player.own_best_hand(game, pl_hand))
-
-        return max(game.bets()) - Player.own_data(game, pl_id).live_bet
+    def move(self, game: Game):
+        return Action.CALL, None
 
 class Folder(Player):
-    def move(self, game: Game, pl_hand: List[Card], pl_id: int):
-        return FOLD
+    def move(self, game: Game):
+        return Action.FOLD, None
 
 class AllIn(Player):
-    def move(self, game: Game, pl_hand: List[Card], pl_id: int):
-        return Player.own_data(game, pl_id).chips
+    def move(self, game: Game):
+        return Action.ALL_IN, None

@@ -30,7 +30,7 @@ class TestHand(unittest.TestCase):
 
         for h in range(len(hands) - 1):
             self.assertLess(hands[h], hands[h+1])
-    
+
     def test_highest_hand(self):
         self.assertEqual(Hand([Card.make('T♥'), Card.make('J♥'), Card.make('Q♥'), Card.make('K♥'), Card.make('A♥')]),
             Hand.get_highest_hand(Card.make('T♥'), Card.make('J♥'), Card.make('Q♥'), Card.make('K♥'), Card.make('A♥'), Card.make('2♠'), Card.make('T♠')),
@@ -42,55 +42,56 @@ class TestGame(unittest.TestCase):
         game = Game(200)
         game.add_player(bots.Raiser(2))
         game.add_player(bots.Checker())
-        game.pldata[-1].chips = 150
+        game.pl_data[-1].chips = 150
         game.add_player(bots.Folder())
-        game.pldata[-1].chips = 100
+        game.pl_data[-1].chips = 100
         game.add_player(bots.AllIn())
-        game.pldata[-1].chips = 50
-        self.assertEqual(len(game.pldata), 4)
+        game.pl_data[-1].chips = 50
+        self.assertEqual(len(game.pl_data), 4)
 
-        self.assertEqual(list(map(lambda x: x.chips, game.pldata)), [200, 150, 100, 50])
+        self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [200, 150, 100, 50])
 
     # preflop
-    #     bets: 50, 50, 2, 50
-    #     chips: 150, 100, 98, 0
-    #     pot: 152
-    # after flop
-    #     bets: 2, 2, -, -
+    #     bets: 52, 52, 2, 50
     #     chips: 148, 98, 98, 0
-    #     main pot: 152
+    #     pot: 152
     #     side pot: 4
-    # after turn
+    # after flop
     #     bets: 2, 2, -, -
     #     chips: 146, 96, 98, 0
     #     main pot: 152
     #     side pot: 8
-    # after river
+    # after turn
     #     bets: 2, 2, -, -
     #     chips: 144, 94, 98, 0
     #     main pot: 152
     #     side pot: 12
+    # after river
+    #     bets: 2, 2, -, -
+    #     chips: 142, 92, 98, 0
+    #     main pot: 152
+    #     side pot: 16
     # showdown:
     #     player 3 and player 0 split main pot
     #     player 0 wins side pot
     #
     # final balances:
-    #     232, 94, 98, 76
+    #     234, 92, 98, 76
     def test_side_hand(self):
         game = Game(200)
         game.add_player(bots.Raiser(2))
         game.add_player(bots.Checker())
-        game.pldata[-1].chips = 150
+        game.pl_data[-1].chips = 150
         game.add_player(bots.Folder())
-        game.pldata[-1].chips = 100
+        game.pl_data[-1].chips = 100
         game.add_player(bots.AllIn())
-        game.pldata[-1].chips = 50
+        game.pl_data[-1].chips = 50
         random.seed(27)
         game.step_hand()
 
         # player 3 and player 0 tie
 
-        self.assertEqual(list(map(lambda x: x.chips, game.pldata)), [232, 94, 98, 76])
+        self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [234, 92, 98, 76])
 
     # test multiple side pots (two all in with different values)
     # preflop
@@ -107,14 +108,14 @@ class TestGame(unittest.TestCase):
     def test_side_hands(self):
         game = Game(100)
         game.add_player(bots.AllIn())
-        game.pldata[-1].chips = 10
+        game.pl_data[-1].chips = 10
         game.add_player(bots.AllIn())
-        game.pldata[-1].chips = 20
+        game.pl_data[-1].chips = 20
         game.add_player(bots.AllIn())
         random.seed(107)
         game.step_hand()
 
-        self.assertEqual(list(map(lambda x: x.chips, game.pldata)), [10, 20, 100])
+        self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [10, 20, 100])
 
     # test bet higher than another player's chips, then all in
     # preflop
@@ -131,15 +132,15 @@ class TestGame(unittest.TestCase):
     def test_side_hands2(self):
         game = Game(100)
         game.add_player(bots.AllIn())
-        game.pldata[-1].chips = 20
+        game.pl_data[-1].chips = 20
         game.add_player(bots.AllIn())
-        game.pldata[-1].chips = 10
+        game.pl_data[-1].chips = 10
         game.add_player(bots.AllIn())
         random.seed(107)
         game.step_hand()
 
 
-        self.assertEqual(list(map(lambda x: x.chips, game.pldata)), [20, 10, 100])
+        self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [20, 10, 100])
 
 if __name__ == '__main__':
     unittest.main()
