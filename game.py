@@ -30,6 +30,7 @@ class PlayerState(Enum):
         return self in (PlayerState.TO_CALL, PlayerState.MOVED)
 
 class Action(Enum):
+    '''Actions that a playaer can take'''
     CALL = 0
     RAISE = 1
     ALL_IN = 2
@@ -67,6 +68,7 @@ class Pot:
 
     ### GETTERS ###
     def total(self) -> int:
+        '''Total chips in pot from all rounds'''
         return self.chips + sum(self.bets.values())
 
     def add(self, pl_id: int, chips: int):
@@ -78,6 +80,7 @@ class Pot:
         return self.raised() - self.bets.get(pl_id, 0)
 
     def players(self) -> Iterator[int]:
+        '''List of player ids in pot'''
         return self.bets.keys()
 
     def split(self) -> Optional[Self]:
@@ -151,51 +154,77 @@ class Game:
         self.pl_data[pl_id].chips -= chips
         self.pots[self.pl_data[pl_id].latest_pot].add(pl_id, chips)
 
-    def bet_round(self):
-        self.current_pl_id = self.pl_left(self.bb_id)
+    def init_hand(self):
+        '''Initializes a new hand'''
+        assert len(self._players) > 1
 
         # blinds
-        if self.betting_round() == BettingRound.PREFLOP:
-            self.__bet(self.sb_id, self.small_blind)
-            self.__bet(self.bb_id, self.big_blind)
+        if len(self._players) == 2:
+            self.sb_id = self.button_id
+        else:
+            self.sb_id = self.pl_left(self.button_id)
+        self.bb_id = self.pl_left(self.sb_id)
+        self.__bet(self.sb_id, self.small_blind)
+        self.__bet(self.bb_id, self.big_blind)
+
+        # deal hands
+        self.community = []
+        for pl in self._players:
+            pl.hand = []
+        self._deck.shuffle()
+        for _ in range(2):
+            for h in [(i + self.sb_id) % len(self._players) for i in range(len(self._players))]:
+                self._players[h].hand.append(self._deck.deal())
 
         # give everyone one turn
-        for pl in self.active_players():
+        for pl in self.pl_data:
             pl.state = PlayerState.TO_CALL
 
-        # wait until all active players have matched bets
-        while len(self.pl_iter(include_states=[PlayerState.TO_CALL])) > 0:
-            if self.current_pl_data.state.active():
-                action, amt = self._players[self.current_pl_id].move(self)
+        self.current_pl_id = self.pl_left(self.bb_id)
 
-                if action == Action.FOLD:
-                    self.current_pl_pot.fold(self.current_pl_id)
-                    self.current_pl_data.state = PlayerState.FOLDED
+    def step_move(self):
+        '''
+        Accept move from one player, handle resulting game state
 
-                elif action == Action.CALL:
-                    to_call = self.current_pl_pot.chips_to_call(self.current_pl_id)
-                    self.__bet(self.current_pl_id, to_call)
-                    self.current_pl_data.state = PlayerState.MOVED
+        Basically step state machine forward with player move from player as input
+        '''
+        if self.current_pl_data.state.active():
+            action, amt = self._players[self.current_pl_id].move(self)
+            bet = None
 
-                elif action == Action.RAISE:
-                    to_call = self.current_pl_pot.chips_to_call(self.current_pl_id)
-                    self.__bet(self.current_pl_id, amt + to_call)
+            if action == Action.FOLD:
+                self.current_pl_pot.fold(self.current_pl_id)
+                self.current_pl_data.state = PlayerState.FOLDED
 
+            elif action == Action.CALL:
+                bet = self.current_pl_pot.chips_to_call(self.current_pl_id)
+                self.current_pl_data.state = PlayerState.MOVED
+
+            elif action == Action.RAISE:
+                bet = amt + self.current_pl_pot.chips_to_call(self.current_pl_id)
+                self.current_pl_data.state = PlayerState.MOVED
+
+            elif action == Action.ALL_IN:
+                bet = self.current_pl_data.chips
+                self.current_pl_data.state = PlayerState.ALL_IN
+
+            if bet:
+                if bet > self.current_pl_pot.chips_to_call(self.current_pl_id):
                     # make everyone else call this raise
-                    for pl in self.active_players():
+                    for pl in self.active_players(start=self.current_pl_id)[1:]:
                         pl.state = PlayerState.TO_CALL
-                    self.current_pl_data.state = PlayerState.MOVED
+                self.__bet(self.current_pl_id, bet)
 
-                elif action == Action.ALL_IN:
-                    self.__bet(self.current_pl_id, self.current_pl_data.chips)
+        self.current_pl_id = self.pl_left(self.current_pl_id)
 
-                    # make everyone else call this raise
-                    for pl in self.active_players():
-                        pl.state = PlayerState.TO_CALL
-                    self.current_pl_data.state = PlayerState.ALL_IN
+        # have all players moved for this round?
+        # is there only one person left who can win?
+        if len(self.pl_iter(include_states=[PlayerState.TO_CALL])) == 0 or \
+           len(self.pl_iter(exclude_states=[PlayerState.FOLDED])) == 1:
+            self.end_round()
 
-            self.current_pl_id = self.pl_left(self.current_pl_id)
-
+    def end_round(self):
+        '''Called at the end of a betting round'''
         # clear remaining bets into most up to date pot
         split = self.pots[-1].split()
         self.pots[-1].collect_bets()
@@ -205,51 +234,39 @@ class Game:
                 self.pl_data[pl].latest_pot += 1
             self.pots.append(split)
 
-    def start_hand(self):
-        assert len(self._players) > 1
+        # give everyone one turn
+        for pl in self.active_players():
+            pl.state = PlayerState.TO_CALL
 
-        self.community = []
-        for pl in self._players:
-            pl.hand = []
+        self.current_pl_id = self.pl_left(self.bb_id)
 
-        if len(self._players) == 2:
-            self.sb_id = self.button_id
-        else:
-            self.sb_id = self.pl_left(self.button_id)
-        self.bb_id = self.pl_left(self.sb_id)
+        # check if only one player remaining or showdown
+        if len(self.active_players()) == 1 or \
+           self.betting_round() == BettingRound.RIVER:
+            self.end_hand()
 
-        # deal hands
-        self._deck.shuffle()
-        for _ in range(2):
-            for h in [(i + self.sb_id) % len(self._players) for i in range(len(self._players))]:
-                self._players[h].hand.append(self._deck.deal())
-
-    def step_hand(self):
-        self.start_hand()
-
-        for rnd in iter(BettingRound):
-            self.bet_round()
-
-            # check if only one player remaining
-            # or showdown
-            if len(list(filter(lambda x: x.state.active(), self.pl_data))) == 1 or \
-               rnd == BettingRound.RIVER:
-                self.end_hand()
-                break
-
-            # deal
-            if rnd != BettingRound.RIVER:
-                self._deck.burn()
-                if rnd == BettingRound.PREFLOP:
-                    self.community.extend(self._deck.deal(3))
-                else:
-                    self.community.append(self._deck.deal())
+        # deal next round
+        if self.betting_round() != BettingRound.RIVER:
+            self._deck.burn()
+            if self.betting_round() == BettingRound.PREFLOP:
+                self.community.extend(self._deck.deal(3))
+            else:
+                self.community.append(self._deck.deal())
 
     def end_hand(self):
+        '''Called at the end of a hand (showdown or one player remaining)'''
         def pl_id(t: Tuple[int, Hand]):
             return t[0]
         def hand(t: Tuple[int, Hand]):
             return t[1]
+
+        # if hand was ended before river, deal rest of community
+        while len(self.community) < 5:
+            self._deck.burn()
+            if self.betting_round() == BettingRound.PREFLOP:
+                self.community.extend(self._deck.deal(3))
+            else:
+                self.community.append(self._deck.deal())
 
         rankings = self.__get_hand_rankings()
         for pot in self.pots:
@@ -271,6 +288,12 @@ class Game:
                 self.pl_data[winner].chips += win_value
 
         self.button_id = self.pl_right(self.button_id)
+
+    def step_hand(self):
+        self.init_hand()
+        starting_button = self.button_id
+        while self.button_id == starting_button:
+            self.step_move()
 
     ### GETTERS ###
 
@@ -298,12 +321,13 @@ class Game:
             if in_iter(self.pl_data[i % len(self.pl_data)])
         ]
 
-    def active_players(self) -> Iterator[Player]:
-        return list(filter(lambda p: p.state.active(), self.pl_data))
+    def active_players(self, start=None) -> Iterator[Player]:
+        return self.pl_iter(start=start, include_states=(PlayerState.TO_CALL, PlayerState.MOVED))
 
     ### MODIFIERS ###
 
     def add_player(self, player: Player):
+        '''Add player to game'''
         self.pl_data.append(PlayerData(
             chips=self.buy_in,
             pl_id=len(self._players),
@@ -314,6 +338,7 @@ class Game:
     ### NON-MODIFIER UTILS ###
 
     def __get_hand_rankings(self) -> List[Tuple[int, Hand]]:
+        '''Returns tuple of (pl_id, highest_hand) sorted by strength of hand of all players'''
         return sorted([
             (i, Hand.get_highest_hand(*self.community, *self._players[i].hand))
             for i in range(len(self._players))
@@ -321,6 +346,7 @@ class Game:
         ], key=lambda x: x[1])
 
     def betting_round(self) -> BettingRound:
+        '''What the current betting round is'''
         return {
             0: BettingRound.PREFLOP,
             3: BettingRound.FLOP,
@@ -329,7 +355,9 @@ class Game:
         }[len(self.community)]
 
     def pl_left(self, pl_id: int, n: int = 1) -> int:
+        '''Player id to left of pl_id by n spots'''
         return (pl_id + n) % len(self._players)
 
     def pl_right(self, pl_id: int, n: int = 1) -> int:
+        '''Player id to right of pl_id by n spots'''
         return (pl_id - n) % len(self._players)

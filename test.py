@@ -139,8 +139,16 @@ class TestGame(unittest.TestCase):
         random.seed(107)
         game.step_hand()
 
-
         self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [20, 10, 100])
+
+    def test_all_fold(self):
+        game = Game(100)
+        game.add_player(bots.Folder())
+        game.add_player(bots.Folder())
+        game.add_player(bots.Folder())
+        game.step_hand()
+
+        self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [100, 99, 101])
 
 if __name__ == '__main__':
     unittest.main()

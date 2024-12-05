@@ -12,8 +12,8 @@
 - ~~improve API of game~~
 	- ~~instead of just int for move, return move type and value~~
 	- ~~only game should be passed~~
-- convert from methods with while loops inside to state machine that you update by running .move
-	- step() method that just gets the mvoe from one person
+- ~~convert from methods with while loops inside to state machine that you update by running .move~~
+	- ~~step() method that just gets the move from one person~~
 	- hand_running() - if not running, need to run init_hand()
 - add comprehensive tester
 - bot testing suite
