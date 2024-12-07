@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Iterator, List, Dict, Tuple, Optional, Self
 
-from util import Deck, same, Card, Hand
+from util import Card, Deck, Hand, it_len, same
 
 class InvalidMoveError(ValueError): ...
 
@@ -19,11 +19,13 @@ class PlayerState(Enum):
     MOVED:   called, checked, or raised
     ALL_IN:  went all in
     FOLDED:  folded
+    OUT:     either not in the current hand or out of chips
     '''
     TO_CALL = 0
     MOVED = 1
     ALL_IN = 2
     FOLDED = 3
+    OUT = 4
 
     def active(self) -> bool:
         '''True if player will still make moves in future betting rounds'''
@@ -41,6 +43,11 @@ class BettingRound(Enum):
     FLOP = 1
     TURN = 2
     RIVER = 3
+
+class GameState(Enum):
+    OVER = 0
+    RUNNING = 1
+    HAND_DONE = 2
 
 # previous round pots should not have any bets, just chips
 # to fold a player, their bet just goes into the pot and they are removed from every pot
@@ -117,6 +124,13 @@ class PlayerData:
     latest_pot: int
     state: PlayerState
 
+    def reset_state(self):
+        '''Should be called at hand init, does not account for live bets'''
+        if self.chips == 0:
+            self.state = PlayerState.OUT
+        else:
+            self.state = PlayerState.TO_CALL
+
 class Player(ABC):
     '''Abstract base class for players'''
     def __init__(self):
@@ -129,10 +143,12 @@ class Player(ABC):
 class Game:
     '''Game'''
     def __init__(self, buy_in: int, bigblind: int = 2):
-        # game state
+        # constants
         self.buy_in: int = buy_in
         self.big_blind: int = bigblind
         self.small_blind: int = bigblind // 2
+
+        self.state: GameState = GameState.OVER
 
         # game state
         self.button_id: int = 0
@@ -156,14 +172,21 @@ class Game:
 
     def init_hand(self):
         '''Initializes a new hand'''
-        assert len(self._players) > 1
+        for pl in self.pl_data:
+            pl.reset_state()
+
+        if it_len(self.in_hand_players()) < 2:
+            self.state = GameState.OVER
+            return
+        else:
+            self.state = GameState.RUNNING
 
         # blinds
         if len(self._players) == 2:
             self.sb_id = self.button_id
         else:
-            self.sb_id = self.pl_left(self.button_id)
-        self.bb_id = self.pl_left(self.sb_id)
+            self.sb_id = next(self.in_hand_players(start=self.button_id, skip_start=True))
+        self.bb_id = next(self.in_hand_players(start=self.sb_id, skip_start=True))
         self.__bet(self.sb_id, self.small_blind)
         self.__bet(self.bb_id, self.big_blind)
 
@@ -176,11 +199,7 @@ class Game:
             for h in [(i + self.sb_id) % len(self._players) for i in range(len(self._players))]:
                 self._players[h].hand.append(self._deck.deal())
 
-        # give everyone one turn
-        for pl in self.pl_data:
-            pl.state = PlayerState.TO_CALL
-
-        self.current_pl_id = self.pl_left(self.bb_id)
+        self.current_pl_id = next(self.in_hand_players(start=self.bb_id, skip_start=True))
 
     def step_move(self):
         '''
@@ -188,6 +207,9 @@ class Game:
 
         Basically step state machine forward with player move from player as input
         '''
+        if self.state != GameState.RUNNING:
+            return
+
         if self.current_pl_data.state.active():
             action, amt = self._players[self.current_pl_id].move(self)
             bet = None
@@ -211,16 +233,16 @@ class Game:
             if bet:
                 if bet > self.current_pl_pot.chips_to_call(self.current_pl_id):
                     # make everyone else call this raise
-                    for pl in self.active_players(start=self.current_pl_id)[1:]:
+                    for pl in self.active_players(skip_start=True):
                         pl.state = PlayerState.TO_CALL
                 self.__bet(self.current_pl_id, bet)
 
-        self.current_pl_id = self.pl_left(self.current_pl_id)
+        self.current_pl_id = next(self.in_hand_players(skip_start=True))
 
         # have all players moved for this round?
         # is there only one person left who can win?
-        if len(self.pl_iter(include_states=[PlayerState.TO_CALL])) == 0 or \
-           len(self.pl_iter(exclude_states=[PlayerState.FOLDED])) == 1:
+        if it_len(self.pl_iter(include_states=(PlayerState.TO_CALL,))) == 0 or \
+           it_len(self.pl_iter(exclude_states=(PlayerState.FOLDED,))) == 1:
             self.end_round()
 
     def end_round(self):
@@ -235,13 +257,14 @@ class Game:
             self.pots.append(split)
 
         # give everyone one turn
+        # don't reset completely b/c players with zero chips could be all in
         for pl in self.active_players():
             pl.state = PlayerState.TO_CALL
 
-        self.current_pl_id = self.pl_left(self.bb_id)
+        self.current_pl_id = next(self.in_hand_players(start=self.bb_id, skip_start=True))
 
         # check if only one player remaining or showdown
-        if len(self.active_players()) == 1 or \
+        if it_len(self.active_players()) == 1 or \
            self.betting_round() == BettingRound.RIVER:
             self.end_hand()
 
@@ -287,12 +310,12 @@ class Game:
             for winner in winners:
                 self.pl_data[winner].chips += win_value
 
-        self.button_id = self.pl_right(self.button_id)
+        self.button_id = next(self.in_hand_players(start=self.button_id, reverse=True, skip_start=True))
+        self.state = GameState.HAND_DONE
 
     def step_hand(self):
         self.init_hand()
-        starting_button = self.button_id
-        while self.button_id == starting_button:
+        while self.state == GameState.RUNNING:
             self.step_move()
 
     ### GETTERS ###
@@ -308,21 +331,58 @@ class Game:
     ### ITERATORS ###
 
     def pl_iter(
-            self,
-            start=None,
-            include_states=(PlayerState.TO_CALL, PlayerState.MOVED, PlayerState.ALL_IN, PlayerState.FOLDED),
-            exclude_states=()) -> Iterator[PlayerData]:
-        start = self.current_pl_id if start is None else start
-        def in_iter(pl: PlayerData) -> bool:
-            return pl.state in include_states and pl.state not in exclude_states
-        return [
-            self.pl_data[i % len(self.pl_data)] for i in
-            range(start, start + len(self.pl_data))
-            if in_iter(self.pl_data[i % len(self.pl_data)])
-        ]
+        self,
+        start=None,
+        reverse=False,
+        include_states=tuple(PlayerState),
+        exclude_states=(),
+        skip_start=False
+    ) -> Iterator[int]:
+        '''
+        Iterator over player ids
 
-    def active_players(self, start=None) -> Iterator[Player]:
-        return self.pl_iter(start=start, include_states=(PlayerState.TO_CALL, PlayerState.MOVED))
+                 start: starting id, current_pl_id if None
+               reverse: moves clockwise if true
+        include_states: which states to include in iterator
+        exclude_states: which states to exclude in iterator
+            skip_start: skips start player
+        '''
+        start = self.current_pl_id if start is None else start
+        reverse = -1 if reverse else 1
+        first = skip_start
+
+        for i in range(start, start + len(self._players) * reverse, reverse):
+            idx = i % len(self._players)
+            state = self.pl_data[idx].state
+            if state in include_states and state not in exclude_states:
+                if first:
+                    first = False
+                    continue
+                yield idx
+
+    def in_hand_players(self, start=None, reverse=False, skip_start=False) -> Iterator[int]:
+        ''''Wrapper for pl_iter excluding players not in the current hand'''
+        return self.pl_iter(start, reverse, exclude_states=(PlayerState.OUT,), skip_start=skip_start)
+
+    def pldata_iter(
+        self,
+        start=None,
+        reverse=False,
+        include_states=tuple(PlayerState),
+        exclude_states=(),
+        skip_start=False
+    ) -> Iterator[int]:
+        return map(
+            lambda i: self.pl_data[i],
+            self.pl_iter(start, reverse, include_states, exclude_states, skip_start)
+        )
+
+    def active_players(self, start=None, reverse=False, skip_start=False) -> Iterator[PlayerData]:
+        return self.pldata_iter(
+            start, reverse,
+            include_states=(PlayerState.TO_CALL, PlayerState.MOVED),
+            skip_start=skip_start
+        )
 
     ### MODIFIERS ###
 
@@ -353,11 +413,3 @@ class Game:
             4: BettingRound.TURN,
             5: BettingRound.RIVER
         }[len(self.community)]
-
-    def pl_left(self, pl_id: int, n: int = 1) -> int:
-        '''Player id to left of pl_id by n spots'''
-        return (pl_id + n) % len(self._players)
-
-    def pl_right(self, pl_id: int, n: int = 1) -> int:
-        '''Player id to right of pl_id by n spots'''
-        return (pl_id - n) % len(self._players)

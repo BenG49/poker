@@ -1,5 +1,5 @@
 - clean up util.Hand.\_\_init\_\_
-- use more iterator methods
+- ~~use more iterator methods~~
 - ~~separate deck into class~~
 - ~~improve pot processing~~
 	- ~~each player should store last pot~~
@@ -17,5 +17,5 @@
 	- hand_running() - if not running, need to run init_hand()
 - add comprehensive tester
 - bot testing suite
-	- inputs: player count
-	- play n by n, grid of average ending value, + or - from buy in
+	- how should bots be tested?
+		- dataset of hand histories?

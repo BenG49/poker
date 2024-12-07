@@ -7,12 +7,17 @@ from random import shuffle
 from typing import List, Iterable
 
 def same(it: Iterable) -> bool:
+    '''True if all items in iterable are equal'''
     last = None
     for i in it:
         if last is not None and last != i:
             return False
         last = i
     return True
+
+def it_len(it: Iterable) -> int:
+    '''Loops through it to find length'''
+    return sum(1 for _ in it)
 
 class Suit(StrEnum):
     SPADES = '♠'
