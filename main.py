@@ -2,23 +2,20 @@
 main.py
 '''
 import bots
-from game import Game, GameState
+from game import Game
+from runner import BotTUI
 
 def main():
     game = Game(buy_in=1000, bigblind=10)
-    game.add_player(bots.AllIn())
-    game.add_player(bots.AllIn())
-    game.add_player(bots.AllIn())
-    game.add_player(bots.AllIn())
+    game.add_player(bots.DumbBot())
+    game.add_player(bots.DumbBot())
+    game.add_player(bots.DumbBot())
+    game.add_player(bots.DumbBot())
 
-    for _ in range(50):
-        game.init_hand()
+    tui = BotTUI(game)
+    tui.run_hand()
 
-        while game.state == GameState.RUNNING:
-            game.step_move()
-        if game.state == GameState.OVER:
-            break
-
+    print()
     print(list(map(lambda x: x.chips, game.pl_data)))
 
 if __name__ == '__main__':

@@ -38,6 +38,16 @@ class Action(Enum):
     ALL_IN = 2
     FOLD = 3
 
+    def to_str(self, amt: Optional[int]) -> str:
+        if self == Action.CALL:
+            return 'called'
+        if self == Action.RAISE:
+            return f'raised ${amt}'
+        if self == Action.ALL_IN:
+            return 'went all in'
+        if self == Action.FOLD:
+            return 'folded'
+
 class BettingRound(Enum):
     PREFLOP = 0
     FLOP = 1
@@ -298,6 +308,7 @@ class Game:
             win_value = pot.total() // len(winners)
             remainder = pot.total() % len(winners)
 
+            # TODO: make this accurate
             if remainder != 0:
                 raise NotImplementedError
 

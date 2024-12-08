@@ -3,6 +3,7 @@ Utility classes Suit, Rank, Card, Hand
 '''
 from dataclasses import dataclass
 from enum import IntEnum, StrEnum
+from itertools import combinations
 from random import shuffle
 from typing import List, Iterable
 
@@ -74,21 +75,16 @@ class Deck:
         self.deck = [Card(Rank(r), Suit(s)) for s in '♠♥♦♣' for r in ranks]
 
     def deal(self, n: int=1):
+        '''Deal n cards, put those cards at the back of the deck'''
         assert n >= 1
 
-        if n == 1:
-            return self.deck.pop()
-
         out = self.deck[-n:]
-        self.deck = self.deck[:-n]
-        return out
+        self.deck = out + self.deck[:-n]
+        return out[0] if n == 1 else out
 
-    def put_back(self, card: Card):
-        self.deck.insert(0, card)
-
-    def burn(self, n=1):
-        for _ in range(n):
-            self.put_back(self.deal())
+    def burn(self, n: int=1):
+        '''Wrapper, deal cards nowhere, put them at the back'''
+        self.deal(n)
 
     def shuffle(self):
         shuffle(self.deck)
@@ -97,14 +93,9 @@ class Hand:
     '''5-card hand class, only stores hand value, not list of Cards'''
     @staticmethod
     def get_highest_hand(*cards: List[Card]):
-        '''Finds highest hand from 7-card list'''
-        assert len(cards) == 7
-
-        hands = []
-        for i in range(6):
-            for j in range(i+1, 7):
-                hands.append(Hand([cards[idx] for idx in range(7) if idx not in (i, j)]))
-        return max(hands)
+        '''Finds highest hand from list of cards'''
+        assert len(cards) >= 5
+        return max(map(Hand, combinations(cards, 5)))
 
     HIGH = 0
     PAIR = 3
@@ -119,6 +110,7 @@ class Hand:
     def __init__(self, cards: List[Card]):
         assert len(cards) == 5
 
+        cards = list(cards)
         cards.sort(key=Card.get_rank)
         ranks = list(map(Card.get_rank, cards))
 
@@ -130,7 +122,7 @@ class Hand:
         if ranks == [Rank.TWO, Rank.THR, Rank.FOUR, Rank.FIVE, Rank.ACE]:
             hand_type += Hand.STRAIGHT
             low_ace = True
-        elif ranks == [i for i in range(cards[0].rank, cards[0].rank+5)]:
+        elif ranks == list(range(cards[0].rank, cards[0].rank+5)):
             hand_type += Hand.STRAIGHT
         # fours
         elif same(ranks[1:]):
@@ -183,6 +175,7 @@ class Hand:
         # secondary rank: 14 bits
         self.value = (hand_type << 28) | (primary_rank << 14) | secondary_rank
         self.string = str(cards)
+        self.hand_type = hand_type
 
     def __gt__(self, other) -> bool:
         return self.value > other.value
