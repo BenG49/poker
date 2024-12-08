@@ -130,7 +130,6 @@ class Pot:
 class PlayerData:
     '''Public player data'''
     chips: int
-    pl_id: int
     latest_pot: int
     state: PlayerState
 
@@ -145,6 +144,7 @@ class Player(ABC):
     '''Abstract base class for players'''
     def __init__(self):
         self.hand = []
+        self.id = None
 
     @abstractmethod
     def move(self, game) -> Tuple[Action, Optional[int]]:
@@ -399,11 +399,12 @@ class Game:
 
     def add_player(self, player: Player):
         '''Add player to game'''
+        player.id = len(self._players)
         self.pl_data.append(PlayerData(
             chips=self.buy_in,
-            pl_id=len(self._players),
             latest_pot=len(self.pots) - 1,
-            state=PlayerState.TO_CALL))
+            state=PlayerState.TO_CALL)
+        )
         self._players.append(player)
 
     ### NON-MODIFIER UTILS ###

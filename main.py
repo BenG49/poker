@@ -7,10 +7,10 @@ from runner import BotTUI
 
 def main():
     game = Game(buy_in=1000, bigblind=10)
-    game.add_player(bots.DumbBot())
-    game.add_player(bots.DumbBot())
-    game.add_player(bots.DumbBot())
-    game.add_player(bots.DumbBot())
+    game.add_player(bots.Checker())
+    game.add_player(bots.Checker())
+    game.add_player(bots.Checker())
+    game.add_player(bots.TerminalPlayer())
 
     tui = BotTUI(game)
     tui.run_hand()
