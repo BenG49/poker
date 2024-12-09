@@ -11,10 +11,14 @@ class Raiser(Player):
         self.min_raise = min_raise
 
     def move(self, game: Game):
-        return Action.RAISE, self.min_raise
+        if game.current_pl_data.chips < game.current_pl_pot.chips_to_call(self.id):
+            return Action.ALL_IN, None
+        return Action.RAISE, min(self.min_raise, game.current_pl_data.chips - game.current_pl_pot.chips_to_call(self.id))
 
 class Checker(Player):
     def move(self, game: Game):
+        if game.current_pl_pot.chips_to_call(self.id) > game.current_pl_data.chips:
+            return Action.FOLD, None
         return Action.CALL, None
 
 class Folder(Player):
@@ -48,5 +52,3 @@ class TerminalPlayer(Player):
         amt = input('Amount to raise: ').strip()
 
         return action, int(amt)
-
-# equity: probabilty of best hand

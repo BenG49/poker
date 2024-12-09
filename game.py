@@ -197,8 +197,8 @@ class Game:
         else:
             self.sb_id = next(self.in_hand_players(start=self.button_id, skip_start=True))
         self.bb_id = next(self.in_hand_players(start=self.sb_id, skip_start=True))
-        self.__bet(self.sb_id, self.small_blind)
-        self.__bet(self.bb_id, self.big_blind)
+        self.__bet(self.sb_id, min(self.small_blind, self.pl_data[self.sb_id].chips))
+        self.__bet(self.bb_id, min(self.big_blind, self.pl_data[self.bb_id].chips))
 
         # deal hands
         self.community = []
@@ -224,6 +224,9 @@ class Game:
             action, amt = self._players[self.current_pl_id].move(self)
             bet = None
 
+            if amt is not None and amt < 0:
+                raise InvalidMoveError('Negative bet supplied!')
+
             if action == Action.FOLD:
                 self.current_pl_pot.fold(self.current_pl_id)
                 self.current_pl_data.state = PlayerState.FOLDED
@@ -243,8 +246,11 @@ class Game:
             if bet:
                 if bet > self.current_pl_pot.chips_to_call(self.current_pl_id):
                     # make everyone else call this raise
-                    for pl in self.active_players(skip_start=True):
-                        pl.state = PlayerState.TO_CALL
+                    it = self.active_players()
+                    if it_len(self.active_players()) > 1:
+                        next(it)
+                        for pl in it:
+                            pl.state = PlayerState.TO_CALL
                 self.__bet(self.current_pl_id, bet)
 
         self.current_pl_id = next(self.in_hand_players(skip_start=True))
@@ -308,9 +314,12 @@ class Game:
             win_value = pot.total() // len(winners)
             remainder = pot.total() % len(winners)
 
-            # TODO: make this accurate
+            # give remainder to first player past button
             if remainder != 0:
-                raise NotImplementedError
+                for i in self.pl_iter(start=self.button_id, skip_start=True):
+                    if i in winners:
+                        self.pl_data[i].chips += remainder
+                        break
 
             # clear pots
             pot.chips = 0
@@ -370,6 +379,10 @@ class Game:
                     first = False
                     continue
                 yield idx
+
+        # yield start player id at end
+        if skip_start:
+            yield start % len(self._players)
 
     def in_hand_players(self, start=None, reverse=False, skip_start=False) -> Iterator[int]:
         ''''Wrapper for pl_iter excluding players not in the current hand'''
