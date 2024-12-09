@@ -1,36 +1,33 @@
 '''
 Stores all poker bots
 '''
-from math import ceil
-from game import Action, BettingRound, Game, Player
-from util import Card, Hand, same
+from typing import Optional, Tuple
+from game import Action, Game, Player
 
 class Raiser(Player):
     def __init__(self, min_raise: int):
         super().__init__()
         self.min_raise = min_raise
 
-    def move(self, game: Game):
+    def move(self, game: Game) -> Tuple[Action, Optional[int]]:
         if game.current_pl_data.chips < game.current_pl_pot.chips_to_call(self.id):
             return Action.ALL_IN, None
         return Action.RAISE, min(self.min_raise, game.current_pl_data.chips - game.current_pl_pot.chips_to_call(self.id))
 
 class Checker(Player):
-    def move(self, game: Game):
-        if game.current_pl_pot.chips_to_call(self.id) > game.current_pl_data.chips:
-            return Action.FOLD, None
+    def move(self, game: Game) -> Tuple[Action, Optional[int]]:
         return Action.CALL, None
 
 class Folder(Player):
-    def move(self, game: Game):
+    def move(self, game: Game) -> Tuple[Action, Optional[int]]:
         return Action.FOLD, None
 
 class AllIn(Player):
-    def move(self, game: Game):
+    def move(self, game: Game) -> Tuple[Action, Optional[int]]:
         return Action.ALL_IN, None
 
 class TerminalPlayer(Player):
-    def move(self, game: Game):
+    def move(self, game: Game) -> Tuple[Action, Optional[int]]:
         print('Your turn.')
         print('Chips:', ', '.join(list(map(lambda p: f'P{p}:(${game.pl_data[p].chips}, bet ${game.current_pl_pot.bets.get(p, 0)})', game.pl_iter(skip_start=True)))))
         print('Community:', game.community)

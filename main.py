@@ -14,7 +14,7 @@ def main():
         game.add_player(bots.Folder())
         game.add_player(bots.AllIn())
 
-        tui = BotTUI(game)
+        tui = BotTUI(game, silent=True)
         tui.run_forever()
         chips = list(map(lambda x: x.chips, game.pl_data))
         for i, c in enumerate(chips):

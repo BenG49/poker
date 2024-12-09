@@ -232,7 +232,10 @@ class Game:
                 self.current_pl_data.state = PlayerState.FOLDED
 
             elif action == Action.CALL:
-                bet = self.current_pl_pot.chips_to_call(self.current_pl_id)
+                bet = min(
+                    self.current_pl_pot.chips_to_call(self.current_pl_id),
+                    self.current_pl_data.chips
+                )
                 self.current_pl_data.state = PlayerState.MOVED
 
             elif action == Action.RAISE:
