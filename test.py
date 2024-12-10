@@ -16,24 +16,24 @@ class TestSame(unittest.TestCase):
 class TestHand(unittest.TestCase):
     def test_hand_ranks(self):
         hands = [
-            Hand([Card.make('T♣'), Card.make('7♥'), Card.make('4♦'), Card.make('K♣'), Card.make('2♠')]),
-            Hand([Card.make('K♣'), Card.make('K♥'), Card.make('7♦'), Card.make('2♣'), Card.make('5♠')]),
-            Hand([Card.make('K♣'), Card.make('K♥'), Card.make('7♦'), Card.make('7♣'), Card.make('5♠')]),
-            Hand([Card.make('K♣'), Card.make('K♥'), Card.make('K♦'), Card.make('7♣'), Card.make('5♠')]),
-            Hand([Card.make('A♣'), Card.make('2♥'), Card.make('3♦'), Card.make('4♣'), Card.make('5♠')]),
-            Hand([Card.make('K♣'), Card.make('Q♣'), Card.make('9♣'), Card.make('8♣'), Card.make('2♣')]),
-            Hand([Card.make('K♣'), Card.make('K♥'), Card.make('K♦'), Card.make('7♣'), Card.make('7♠')]),
-            Hand([Card.make('6♠'), Card.make('6♦'), Card.make('6♥'), Card.make('6♣'), Card.make('K♠')]),
-            Hand([Card.make('2♠'), Card.make('3♠'), Card.make('4♠'), Card.make('5♠'), Card.make('6♠')]),
-            Hand([Card.make('T♥'), Card.make('J♥'), Card.make('Q♥'), Card.make('K♥'), Card.make('A♥')])
+            Hand([Card.make('Tc'), Card.make('7h'), Card.make('4d'), Card.make('Kc'), Card.make('2s')]),
+            Hand([Card.make('Kc'), Card.make('Kh'), Card.make('7d'), Card.make('2c'), Card.make('5s')]),
+            Hand([Card.make('Kc'), Card.make('Kh'), Card.make('7d'), Card.make('7c'), Card.make('5s')]),
+            Hand([Card.make('Kc'), Card.make('Kh'), Card.make('Kd'), Card.make('7c'), Card.make('5s')]),
+            Hand([Card.make('Ac'), Card.make('2h'), Card.make('3d'), Card.make('4c'), Card.make('5s')]),
+            Hand([Card.make('Kc'), Card.make('Qc'), Card.make('9c'), Card.make('8c'), Card.make('2c')]),
+            Hand([Card.make('Kc'), Card.make('Kh'), Card.make('Kd'), Card.make('7c'), Card.make('7s')]),
+            Hand([Card.make('6s'), Card.make('6d'), Card.make('6h'), Card.make('6c'), Card.make('Ks')]),
+            Hand([Card.make('2s'), Card.make('3s'), Card.make('4s'), Card.make('5s'), Card.make('6s')]),
+            Hand([Card.make('Th'), Card.make('Jh'), Card.make('Qh'), Card.make('Kh'), Card.make('Ah')])
         ]
 
         for h in range(len(hands) - 1):
             self.assertLess(hands[h], hands[h+1])
 
     def test_highest_hand(self):
-        self.assertEqual(Hand([Card.make('T♥'), Card.make('J♥'), Card.make('Q♥'), Card.make('K♥'), Card.make('A♥')]),
-            Hand.get_highest_hand(Card.make('T♥'), Card.make('J♥'), Card.make('Q♥'), Card.make('K♥'), Card.make('A♥'), Card.make('2♠'), Card.make('T♠')),
+        self.assertEqual(Hand([Card.make('Th'), Card.make('Jh'), Card.make('Qh'), Card.make('Kh'), Card.make('Ah')]),
+            Hand.get_highest_hand(Card.make('Th'), Card.make('Jh'), Card.make('Qh'), Card.make('Kh'), Card.make('Ah'), Card.make('2s'), Card.make('Ts')),
             'Found the wrong highest hand!')
 
 

@@ -1,11 +1,10 @@
 '''
 Utility classes Suit, Rank, Card, Hand
 '''
-from dataclasses import dataclass
-from enum import IntEnum, StrEnum
+from enum import IntEnum
 from itertools import combinations
 from random import shuffle
-from typing import List, Iterable
+from typing import List, Iterable, Self
 
 def same(it: Iterable) -> bool:
     '''True if all items in iterable are equal'''
@@ -20,11 +19,18 @@ def it_len(it: Iterable) -> int:
     '''Loops through it to find length'''
     return sum(1 for _ in it)
 
-class Suit(StrEnum):
-    SPADES = '♠'
-    HEARTS = '♥'
-    DIAMONDS = '♦'
-    CLUBS = '♣'
+class Suit(IntEnum):
+    SPADES = 0 << 4
+    HEARTS = 1 << 4
+    DIAMONDS = 2 << 4
+    CLUBS = 3 << 4
+
+    @staticmethod
+    def from_str(s: str):
+        return 'shdc'.index(s)
+
+    def to_str(self) -> str:
+        return 'shdc'[self.value]
 
 class Rank(IntEnum):
     TWO = 2
@@ -48,15 +54,18 @@ class Rank(IntEnum):
     def to_str(self) -> str:
         return '  23456789TJQKA'[self.value]
 
-@dataclass
-class Card:
-    rank: Rank
-    suit: Suit
+class Card(int):
+    '''6 bits: 2 suit + 4 rank'''
+    def __new__(cls, rank: int, suit: int):
+        instance = super().__new__(cls, suit | rank)
+        instance.rank = rank
+        instance.suit = suit
+        return instance
 
     @staticmethod
     def make(s: str):
         assert len(s) == 2
-        return Card(Rank.from_str(s[0]), Suit(s[1]))
+        return Card(Rank.from_str(s[0]), Suit.from_str(s[1]))
 
     def get_rank(self):
         return self.rank
@@ -72,7 +81,7 @@ class Card:
 class Deck:
     def __init__(self):
         ranks = [Rank.ACE] + list(range(Rank.TWO, Rank.ACE))
-        self.deck = [Card(Rank(r), Suit(s)) for s in '♠♥♦♣' for r in ranks]
+        self.deck = [Card(Rank(r), Suit(s)) for s in iter(Suit) for r in ranks]
 
     def deal(self, n: int=1):
         '''Deal n cards, put those cards at the back of the deck'''
@@ -89,10 +98,10 @@ class Deck:
     def shuffle(self):
         shuffle(self.deck)
 
-class Hand:
+class Hand(int):
     '''5-card hand class, only stores hand value, not list of Cards'''
     @staticmethod
-    def get_highest_hand(*cards: List[Card]):
+    def get_highest_hand(*cards: List[Card]) -> Self:
         '''Finds highest hand from list of cards'''
         assert len(cards) >= 5
         return max(map(Hand, combinations(cards, 5)))
@@ -107,7 +116,7 @@ class Hand:
     FOURS = 9
     STR_FLUSH = STRAIGHT + FLUSH
 
-    def __init__(self, cards: List[Card]):
+    def __new__(cls, cards: List[Card]) -> int:
         assert len(cards) == 5
 
         cards = list(cards)
@@ -119,6 +128,7 @@ class Hand:
 
         hand_type = Hand.FLUSH if same(map(Card.get_suit, cards)) else 0
 
+        # straight, straight flush
         if ranks == [Rank.TWO, Rank.THR, Rank.FOUR, Rank.FIVE, Rank.ACE]:
             hand_type += Hand.STRAIGHT
             low_ace = True
@@ -173,17 +183,14 @@ class Hand:
         # hand type:       4 bits
         # primary rank:   14 bits
         # secondary rank: 14 bits
-        self.value = (hand_type << 28) | (primary_rank << 14) | secondary_rank
-        self.string = str(cards)
-        self.hand_type = hand_type
+        value = (hand_type << 28) | (primary_rank << 14) | secondary_rank
 
-    def __gt__(self, other) -> bool:
-        return self.value > other.value
-
-    def __eq__(self, other) -> bool:
-        return self.value == other.value
+        instance = super().__new__(cls, value)
+        instance.hand_type = hand_type
+        instance.cards = cards
+        return instance
 
     def __repr__(self) -> str:
         return self.__str__()
     def __str__(self) -> str:
-        return self.string + f',{self.value >> 28}:{(self.value >> 14)&0x3FFF}:{self.value&0x3FFF}'
+        return str(self.cards) + f',{self >> 28}:{(self >> 14)&0x3FFF}:{self&0x3FFF}'
