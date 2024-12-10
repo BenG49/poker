@@ -337,6 +337,7 @@ class Game:
         self.state = GameState.HAND_DONE
 
     def step_hand(self):
+        '''Run one hand'''
         self.init_hand()
         while self.state == GameState.RUNNING:
             self.step_move()
@@ -399,12 +400,14 @@ class Game:
         exclude_states=(),
         skip_start=False
     ) -> Iterator[int]:
+        '''pl_iter over pl_data'''
         return map(
             lambda i: self.pl_data[i],
             self.pl_iter(start, reverse, include_states, exclude_states, skip_start)
         )
 
     def active_players(self, start=None, reverse=False, skip_start=False) -> Iterator[PlayerData]:
+        '''Wrap pldata_iter for active players (only those who have yet to call or have called)'''
         return self.pldata_iter(
             start, reverse,
             include_states=(PlayerState.TO_CALL, PlayerState.MOVED),

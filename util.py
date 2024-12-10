@@ -20,6 +20,7 @@ def it_len(it: Iterable) -> int:
     return sum(1 for _ in it)
 
 class Suit(IntEnum):
+    '''Suit enum'''
     SPADES = 0
     HEARTS = 1
     DIAMONDS = 2
@@ -27,12 +28,15 @@ class Suit(IntEnum):
 
     @staticmethod
     def from_str(s: str):
+        '''Create Suit from string'''
         return 'shdc'.index(s)
 
     def to_str(self) -> str:
+        '''Convert Suit to string'''
         return 'shdc'[self.value]
 
 class Rank(IntEnum):
+    '''Rank enum'''
     TWO = 0
     THR = 1
     FOUR = 2
@@ -49,9 +53,11 @@ class Rank(IntEnum):
 
     @staticmethod
     def from_str(s: str):
+        '''Create Rank from string'''
         return '23456789TJQKA'.index(s)
 
     def to_str(self) -> str:
+        ''' Convert Rank to string'''
         return '23456789TJQKA'[self.value]
 
 class Card(int):
@@ -63,14 +69,17 @@ class Card(int):
         return instance
 
     @staticmethod
-    def make(s: str):
+    def new(s: str):
+        '''Create card from string, ex. Kh (king of hearts)'''
         assert len(s) == 2
         return Card(Rank.from_str(s[0]), Suit.from_str(s[1]))
 
     def get_rank(self):
+        '''Rank getter'''
         return self.rank
 
     def get_suit(self):
+        '''Suit getter'''
         return self.suit
 
     def __repr__(self) -> str:
@@ -79,6 +88,7 @@ class Card(int):
         return Rank(self.rank).to_str() + Suit(self.suit).to_str()
 
 class Deck:
+    '''52-card list with helper methods for dealing'''
     def __init__(self):
         ranks = [Rank.ACE] + list(range(Rank.TWO, Rank.ACE))
         self.deck = [Card(Rank(r), Suit(s)) for s in iter(Suit) for r in ranks]
@@ -96,6 +106,7 @@ class Deck:
         self.deal(n)
 
     def shuffle(self):
+        '''Shuffle internal card list'''
         shuffle(self.deck)
 
 class Hand(int):

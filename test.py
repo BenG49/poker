@@ -4,28 +4,31 @@ Unit testing for util.py and game.py
 import unittest
 import random
 
-from util import same, Hand, Card
+from util import Hand, Card, it_len, same
 from game import Game
 import bots
 
-class TestSame(unittest.TestCase):
+class TestUtils(unittest.TestCase):
     def test_same(self):
         self.assertTrue(same([1, 1, 1]))
         self.assertFalse(same([1, 1, 0]))
 
+    def test_itlen(self):
+        self.assertEqual(it_len(map(lambda x: x**2, [0, 1, 2])), 3)
+
 class TestHand(unittest.TestCase):
     def test_hand_ranks(self):
         hands = [
-            Hand([Card.make('Tc'), Card.make('7h'), Card.make('4d'), Card.make('Kc'), Card.make('2s')]),
-            Hand([Card.make('Kc'), Card.make('Kh'), Card.make('7d'), Card.make('2c'), Card.make('5s')]),
-            Hand([Card.make('Kc'), Card.make('Kh'), Card.make('7d'), Card.make('7c'), Card.make('5s')]),
-            Hand([Card.make('Kc'), Card.make('Kh'), Card.make('Kd'), Card.make('7c'), Card.make('5s')]),
-            Hand([Card.make('Ac'), Card.make('2h'), Card.make('3d'), Card.make('4c'), Card.make('5s')]),
-            Hand([Card.make('Kc'), Card.make('Qc'), Card.make('9c'), Card.make('8c'), Card.make('2c')]),
-            Hand([Card.make('Kc'), Card.make('Kh'), Card.make('Kd'), Card.make('7c'), Card.make('7s')]),
-            Hand([Card.make('6s'), Card.make('6d'), Card.make('6h'), Card.make('6c'), Card.make('Ks')]),
-            Hand([Card.make('2s'), Card.make('3s'), Card.make('4s'), Card.make('5s'), Card.make('6s')]),
-            Hand([Card.make('Th'), Card.make('Jh'), Card.make('Qh'), Card.make('Kh'), Card.make('Ah')])
+            Hand([Card.new('Tc'), Card.new('7h'), Card.new('4d'), Card.new('Kc'), Card.new('2s')]),
+            Hand([Card.new('Kc'), Card.new('Kh'), Card.new('7d'), Card.new('2c'), Card.new('5s')]),
+            Hand([Card.new('Kc'), Card.new('Kh'), Card.new('7d'), Card.new('7c'), Card.new('5s')]),
+            Hand([Card.new('Kc'), Card.new('Kh'), Card.new('Kd'), Card.new('7c'), Card.new('5s')]),
+            Hand([Card.new('Ac'), Card.new('2h'), Card.new('3d'), Card.new('4c'), Card.new('5s')]),
+            Hand([Card.new('Kc'), Card.new('Qc'), Card.new('9c'), Card.new('8c'), Card.new('2c')]),
+            Hand([Card.new('Kc'), Card.new('Kh'), Card.new('Kd'), Card.new('7c'), Card.new('7s')]),
+            Hand([Card.new('6s'), Card.new('6d'), Card.new('6h'), Card.new('6c'), Card.new('Ks')]),
+            Hand([Card.new('2s'), Card.new('3s'), Card.new('4s'), Card.new('5s'), Card.new('6s')]),
+            Hand([Card.new('Th'), Card.new('Jh'), Card.new('Qh'), Card.new('Kh'), Card.new('Ah')])
         ]
 
         assert hands == [
@@ -42,8 +45,8 @@ class TestHand(unittest.TestCase):
         ]
 
     def test_highest_hand(self):
-        self.assertEqual(Hand([Card.make('Th'), Card.make('Jh'), Card.make('Qh'), Card.make('Kh'), Card.make('Ah')]),
-            Hand.get_highest_hand(Card.make('Th'), Card.make('Jh'), Card.make('Qh'), Card.make('Kh'), Card.make('Ah'), Card.make('2s'), Card.make('Ts')),
+        self.assertEqual(Hand([Card.new('Th'), Card.new('Jh'), Card.new('Qh'), Card.new('Kh'), Card.new('Ah')]),
+            Hand.get_highest_hand(Card.new('Th'), Card.new('Jh'), Card.new('Qh'), Card.new('Kh'), Card.new('Ah'), Card.new('2s'), Card.new('Ts')),
             'Found the wrong highest hand!')
 
 
