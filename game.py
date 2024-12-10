@@ -431,7 +431,7 @@ class Game:
             (i, Hand.get_highest_hand(*self.community, *self._players[i].hand))
             for i in range(len(self._players))
             if self.pl_data[i].state != PlayerState.FOLDED
-        ], key=lambda x: x[1])
+        ], key=lambda x: x[1], reverse=True)
 
     def betting_round(self) -> BettingRound:
         '''What the current betting round is'''

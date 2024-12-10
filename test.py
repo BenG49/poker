@@ -28,8 +28,18 @@ class TestHand(unittest.TestCase):
             Hand([Card.make('Th'), Card.make('Jh'), Card.make('Qh'), Card.make('Kh'), Card.make('Ah')])
         ]
 
-        for h in range(len(hands) - 1):
-            self.assertLess(hands[h], hands[h+1])
+        assert hands == [
+            6926,
+            3752,
+            2662,
+            1728,
+            1609,
+            884,
+            185,
+            108,
+            9,
+            1
+        ]
 
     def test_highest_hand(self):
         self.assertEqual(Hand([Card.make('Th'), Card.make('Jh'), Card.make('Qh'), Card.make('Kh'), Card.make('Ah')]),

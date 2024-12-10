@@ -4,7 +4,7 @@ Utility classes Suit, Rank, Card, Hand
 from enum import IntEnum
 from itertools import combinations
 from random import shuffle
-from typing import List, Iterable, Self
+from typing import Dict, List, Iterable, Self
 
 def same(it: Iterable) -> bool:
     '''True if all items in iterable are equal'''
@@ -20,10 +20,10 @@ def it_len(it: Iterable) -> int:
     return sum(1 for _ in it)
 
 class Suit(IntEnum):
-    SPADES = 0 << 4
-    HEARTS = 1 << 4
-    DIAMONDS = 2 << 4
-    CLUBS = 3 << 4
+    SPADES = 0
+    HEARTS = 1
+    DIAMONDS = 2
+    CLUBS = 3
 
     @staticmethod
     def from_str(s: str):
@@ -33,31 +33,31 @@ class Suit(IntEnum):
         return 'shdc'[self.value]
 
 class Rank(IntEnum):
-    TWO = 2
-    THR = 3
-    FOUR = 4
-    FIVE = 5
-    SIX = 6
-    SEVEN = 7
-    EIGHT = 8
-    NINE = 9
-    TEN = 10
-    JACK = 11
-    QUEEN = 12
-    KING = 13
-    ACE = 14
+    TWO = 0
+    THR = 1
+    FOUR = 2
+    FIVE = 3
+    SIX = 4
+    SEVEN = 5
+    EIGHT = 6
+    NINE = 7
+    TEN = 8
+    JACK = 9
+    QUEEN = 10
+    KING = 11
+    ACE = 12
 
     @staticmethod
     def from_str(s: str):
-        return '  23456789TJQKA'.index(s)
+        return '23456789TJQKA'.index(s)
 
     def to_str(self) -> str:
-        return '  23456789TJQKA'[self.value]
+        return '23456789TJQKA'[self.value]
 
 class Card(int):
     '''6 bits: 2 suit + 4 rank'''
     def __new__(cls, rank: int, suit: int):
-        instance = super().__new__(cls, suit | rank)
+        instance = super().__new__(cls, (suit << 4) | rank)
         instance.rank = rank
         instance.suit = suit
         return instance
@@ -76,7 +76,7 @@ class Card(int):
     def __repr__(self) -> str:
         return self.__str__()
     def __str__(self) -> str:
-        return Rank(self.rank).to_str() + str(self.suit)
+        return Rank(self.rank).to_str() + Suit(self.suit).to_str()
 
 class Deck:
     def __init__(self):
@@ -104,7 +104,7 @@ class Hand(int):
     def get_highest_hand(*cards: List[Card]) -> Self:
         '''Finds highest hand from list of cards'''
         assert len(cards) >= 5
-        return max(map(Hand, combinations(cards, 5)))
+        return min(map(Hand, combinations(cards, 5)))
 
     HIGH = 0
     PAIR = 3
@@ -116,81 +116,174 @@ class Hand(int):
     FOURS = 9
     STR_FLUSH = STRAIGHT + FLUSH
 
+    STR_FLUSH_COUNT = 10
+    FOURS_COUNT = 156
+    FULL_COUNT = 156
+    FLUSH_COUNT = 1277
+    STRAIGHT_COUNT = 10 # no flushes
+    TRIPS_COUNT = 858
+    TPAIR_COUNT = 858
+    PAIR_COUNT = 2860
+    HIGH_COUNT = 1277
+
+    HAND_COUNT = 7462
+
+    STR_FLUSH_START = 1
+    FOURS_START = STR_FLUSH_START + STR_FLUSH_COUNT
+    FULL_START = FOURS_START + FOURS_COUNT
+    FLUSH_START = FULL_START + FULL_COUNT
+    STRAIGHT_START = FLUSH_START + FLUSH_COUNT
+    TRIPS_START = STRAIGHT_START + STRAIGHT_COUNT
+    TPAIR_START = TRIPS_START + TRIPS_COUNT
+    PAIR_START = TPAIR_START + TPAIR_COUNT
+    HIGH_START = PAIR_START + PAIR_COUNT
+
+    FLUSH_BIT = 0x100000
+
+    @staticmethod
+    def lookup_key(ranks: List[int], flush: bool) -> int:
+        '''Create lookup table key from 5 ranks (sorted) and flush bit'''
+        key = Hand.FLUSH_BIT if flush else 0
+        for i, rank in enumerate(ranks):
+            key |= (rank & 0xF) << (4 * (4-i))
+        return key
+
+    @staticmethod
+    def generate_lookup() -> Dict[int, int]:
+        '''
+        21 bit int (1 bit flush + 5x4 bit rank value, ordered 2->A) -> [1,7462] hand value
+        '''
+
+        lookup = {}
+
+        # straight flushes + straights
+        for i, h in enumerate([
+            0x89ABC, # TJQKA
+            0x789AB, # 9TJQK
+            0x6789A, # 89TJQ
+            0x56789, # 789TJ
+            0x45678, # 6789T
+            0x34567, # 56789
+            0x23456, # 45678
+            0x12345, # 34567
+            0x01234, # 23456
+            0x0123C, # 2345A
+        ]):
+            lookup[h] = Hand.STRAIGHT_START + i
+            lookup[h | Hand.FLUSH_BIT] = Hand.STR_FLUSH_START + i
+
+        # just do some first and then ill see how to generalize
+
+        # fours, full house
+        # aaaa b
+        # aaa bb
+        n = Hand.FOURS_COUNT - 1
+        for a in iter(Rank):
+            for b in iter(Rank):
+                if a == b:
+                    continue
+                if a > b:
+                    fours = Hand.lookup_key([b, a, a, a, a], False)
+                    full = Hand.lookup_key([b, b, a, a, a], False)
+                else:
+                    fours = Hand.lookup_key([a, a, a, a, b], False)
+                    full = Hand.lookup_key([a, a, a, b, b], False)
+
+                lookup[fours] = n + Hand.FOURS_START
+                lookup[fours | Hand.FLUSH_BIT] = n + Hand.FOURS_START
+                lookup[full] = n + Hand.FULL_START
+                lookup[full | Hand.FLUSH_BIT] = n + Hand.FULL_START
+                n -= 1
+
+        # trips
+        # aaa bc
+        n = Hand.TRIPS_COUNT - 1
+        for a in iter(Rank):
+            for b in iter(Rank):
+                if a == b:
+                    continue
+                for c in range(0, b):
+                    if a == c:
+                        continue
+
+                    hand = Hand.lookup_key(sorted([a, a, a, b, c]), False)
+                    lookup[hand] = n + Hand.TRIPS_START
+                    lookup[hand | Hand.FLUSH_BIT] = n + Hand.TRIPS_START
+                    n -= 1
+
+        # two pair
+        # aabb c
+        n = Hand.TPAIR_COUNT - 1
+        for a in iter(Rank):
+            for b in range(0, a):
+                for c in iter(Rank):
+                    if c in (a, b):
+                        continue
+
+                    hand = Hand.lookup_key(sorted([a, a, b, b, c]), False)
+                    lookup[hand] = n + Hand.TPAIR_START
+                    lookup[hand | Hand.FLUSH_BIT] = n + Hand.TPAIR_START
+                    n -= 1
+
+        # pair
+        # aa bcd
+        n = Hand.PAIR_COUNT - 1
+        for a in iter(Rank):
+            for b in iter(Rank):
+                if a == b:
+                    continue
+                for c in range(0, b):
+                    if a == c:
+                        continue
+                    for d in range(0, c):
+                        if a == d:
+                            continue
+
+                        hand = Hand.lookup_key(sorted([a, a, b, c, d]), False)
+                        lookup[hand] = n + Hand.PAIR_START
+                        lookup[hand | Hand.FLUSH_BIT] = n + Hand.PAIR_START
+                        n -= 1
+
+
+        # high, flush
+        # abcde
+        n = Hand.HIGH_COUNT - 1
+        for a in iter(Rank):
+            for b in range(0, a):
+                for c in range(0, b):
+                    for d in range(0, c):
+                        for e in range(0, d):
+                            if [0, d - e, c - e, b - e, a - e] == [0, 1, 2, 3, 4]:
+                                continue
+                            if [e, d, c, b, a] == [0, 1, 2, 3, Rank.ACE]:
+                                continue
+
+                            hand = Hand.lookup_key([e, d, c, b, a], False)
+                            lookup[hand] = n + Hand.HIGH_START
+                            lookup[hand | Hand.FLUSH_BIT] = n + Hand.FLUSH_START
+                            n -= 1
+
+        return lookup
+
+    @staticmethod
+    def lookup(cards: List[Card]) -> int:
+        '''Access hand ranking lookup table.'''
+        flush = same(map(Card.get_suit, cards))
+        cards.sort(key=Card.get_rank)
+
+        return Hand.LOOKUP.get(Hand.lookup_key(cards, flush))
+
     def __new__(cls, cards: List[Card]) -> int:
         assert len(cards) == 5
 
         cards = list(cards)
-        cards.sort(key=Card.get_rank)
-        ranks = list(map(Card.get_rank, cards))
-
-        primary_indicies = list(range(5))
-        low_ace = False
-
-        hand_type = Hand.FLUSH if same(map(Card.get_suit, cards)) else 0
-
-        # straight, straight flush
-        if ranks == [Rank.TWO, Rank.THR, Rank.FOUR, Rank.FIVE, Rank.ACE]:
-            hand_type += Hand.STRAIGHT
-            low_ace = True
-        elif ranks == list(range(cards[0].rank, cards[0].rank+5)):
-            hand_type += Hand.STRAIGHT
-        # fours
-        elif same(ranks[1:]):
-            hand_type += Hand.FOURS
-            primary_indicies = primary_indicies[1:]
-        elif same(ranks[:-1]):
-            hand_type += Hand.FOURS
-            primary_indicies = primary_indicies[:-1]
-        # middle trips, not pair
-        elif same(ranks[1:-1]):
-            hand_type += Hand.TRIPS
-            primary_indicies = primary_indicies[1:-1]
-        # top trips
-        elif same(ranks[2:]):
-            hand_type += Hand.TRIPS
-            primary_indicies = primary_indicies[2:]
-            if same(ranks[:-3]):
-                hand_type += Hand.PAIR
-        # bottom trips
-        elif same(ranks[:-2]):
-            hand_type += Hand.TRIPS
-            primary_indicies = primary_indicies[:-2]
-            if same(ranks[3:]):
-                hand_type += Hand.PAIR
-        # two pair
-        elif same(ranks[1:3]) and same(ranks[3:5]):
-            hand_type += Hand.TPAIR
-            primary_indicies = primary_indicies[1:]
-        elif same(ranks[0:2]) and same(ranks[3:5]):
-            hand_type += Hand.TPAIR
-            primary_indicies = [0, 1, 3, 4]
-        elif same(ranks[0:2]) and same(ranks[2:4]):
-            hand_type += Hand.TPAIR
-            primary_indicies = primary_indicies[:4]
-
-        # based on Kevin Watkins's blog post
-        # bit values, high to low:
-        # AKQJT98765432A
-        def create_rank_value(ranks: List[Rank]) -> int:
-            out = 0
-            for rank in ranks:
-                out += 1 << (0 if rank == Rank.ACE and low_ace else rank - 1)
-            return out
-
-        primary_rank = create_rank_value([ranks[i] for i in primary_indicies])
-        secondary_rank = create_rank_value([ranks[i] for i in range(5) if i not in primary_indicies])
-
-        # hand type:       4 bits
-        # primary rank:   14 bits
-        # secondary rank: 14 bits
-        value = (hand_type << 28) | (primary_rank << 14) | secondary_rank
+        value = Hand.lookup(cards)
 
         instance = super().__new__(cls, value)
-        instance.hand_type = hand_type
         instance.cards = cards
         return instance
 
-    def __repr__(self) -> str:
-        return self.__str__()
     def __str__(self) -> str:
-        return str(self.cards) + f',{self >> 28}:{(self >> 14)&0x3FFF}:{self&0x3FFF}'
+        return super().__str__() + ':' + str(self.cards)
+
+Hand.LOOKUP = Hand.generate_lookup()

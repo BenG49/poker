@@ -15,9 +15,9 @@
 - ~~convert from methods with while loops inside to state machine that you update by running .move~~
 	- ~~step() method that just gets the move from one person~~
 	- hand_running() - if not running, need to run init_hand()
-- convert hand to continuous numbers 1 to 7462
-	- add helper methods
-	- convert card to int
+- ~~convert hand to continuous numbers 1 to 7462~~
+	- ~~add helper methods~~
+	- ~~convert card to int~~
 	- add equity calculation
 - raise x vs raise _to_ x
 - add comprehensive tester
