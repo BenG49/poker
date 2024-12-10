@@ -1,7 +1,8 @@
 '''
 Utility classes Suit, Rank, Card, Hand
 '''
-from enum import IntEnum
+from collections import Counter
+from enum import Enum, IntEnum
 from itertools import combinations
 from random import shuffle
 from typing import Dict, List, Iterable, Self
@@ -29,7 +30,7 @@ class Suit(IntEnum):
     @staticmethod
     def from_str(s: str):
         '''Create Suit from string'''
-        return 'shdc'.index(s)
+        return Suit('shdc'.index(s))
 
     def to_str(self) -> str:
         '''Convert Suit to string'''
@@ -54,11 +55,28 @@ class Rank(IntEnum):
     @staticmethod
     def from_str(s: str):
         '''Create Rank from string'''
-        return '23456789TJQKA'.index(s)
+        return Rank('23456789TJQKA'.index(s))
 
     def to_str(self) -> str:
         ''' Convert Rank to string'''
         return '23456789TJQKA'[self.value]
+
+    def prettyprint(self) -> str:
+        return [
+            'Two',
+            'Three',
+            'Four',
+            'Five',
+            'Six',
+            'Seven',
+            'Eight',
+            'Nine',
+            'Ten',
+            'Jack',
+            'Queen',
+            'King',
+            'Ace'
+        ][self.value]
 
 class Card(int):
     '''6 bits: 2 suit + 4 rank'''
@@ -109,23 +127,39 @@ class Deck:
         '''Shuffle internal card list'''
         shuffle(self.deck)
 
+class HandType(Enum):
+    HIGH = 0
+    PAIR = 1
+    TPAIR = 2
+    TRIPS = 3
+    STRAIGHT = 4
+    FLUSH = 5
+    FULL = 6
+    FOURS = 7
+    STR_FLUSH = 8
+
+    def to_str(self) -> str:
+        return [
+            'High Card',
+            'Pair',
+            'Two Pair',
+            'Three of a Kind',
+            'Straight',
+            'Flush',
+            'Full House',
+            'Four of a Kind',
+            'Straight Flush'
+        ][self.value]
+
 class Hand(int):
     '''5-card hand class, only stores hand value, not list of Cards'''
     @staticmethod
-    def get_highest_hand(*cards: List[Card]) -> Self:
+    def get_best_hand(*cards: List[Card]) -> Self:
         '''Finds highest hand from list of cards'''
         assert len(cards) >= 5
         return min(map(Hand, combinations(cards, 5)))
 
-    HIGH = 0
-    PAIR = 3
-    TPAIR = 4
-    TRIPS = 5
-    STRAIGHT = 6
-    FLUSH = 7
-    FULL = PAIR + TRIPS
-    FOURS = 9
-    STR_FLUSH = STRAIGHT + FLUSH
+    HAND_COUNT = 7462
 
     STR_FLUSH_COUNT = 10
     FOURS_COUNT = 156
@@ -137,17 +171,25 @@ class Hand(int):
     PAIR_COUNT = 2860
     HIGH_COUNT = 1277
 
-    HAND_COUNT = 7462
+    STR_FLUSH_BEST = 1
+    FOURS_BEST = STR_FLUSH_BEST + STR_FLUSH_COUNT
+    FULL_BEST = FOURS_BEST + FOURS_COUNT
+    FLUSH_BEST = FULL_BEST + FULL_COUNT
+    STRAIGHT_BEST = FLUSH_BEST + FLUSH_COUNT
+    TRIPS_BEST = STRAIGHT_BEST + STRAIGHT_COUNT
+    TPAIR_BEST = TRIPS_BEST + TRIPS_COUNT
+    PAIR_BEST = TPAIR_BEST + TPAIR_COUNT
+    HIGH_BEST = PAIR_BEST + PAIR_COUNT
 
-    STR_FLUSH_START = 1
-    FOURS_START = STR_FLUSH_START + STR_FLUSH_COUNT
-    FULL_START = FOURS_START + FOURS_COUNT
-    FLUSH_START = FULL_START + FULL_COUNT
-    STRAIGHT_START = FLUSH_START + FLUSH_COUNT
-    TRIPS_START = STRAIGHT_START + STRAIGHT_COUNT
-    TPAIR_START = TRIPS_START + TRIPS_COUNT
-    PAIR_START = TPAIR_START + TPAIR_COUNT
-    HIGH_START = PAIR_START + PAIR_COUNT
+    STR_FLUSH_WORST = FOURS_BEST - 1
+    FOURS_WORST = FULL_BEST - 1
+    FULL_WORST = FLUSH_BEST - 1
+    FLUSH_WORST = STRAIGHT_BEST - 1
+    STRAIGHT_WORST = TRIPS_BEST - 1
+    TRIPS_WORST = TPAIR_BEST - 1
+    TPAIR_WORST = PAIR_BEST - 1
+    PAIR_WORST = HIGH_BEST - 1
+    HIGH_WORST = HAND_COUNT
 
     FLUSH_BIT = 0x100000
 
@@ -180,8 +222,8 @@ class Hand(int):
             0x01234, # 23456
             0x0123C, # 2345A
         ]):
-            lookup[h] = Hand.STRAIGHT_START + i
-            lookup[h | Hand.FLUSH_BIT] = Hand.STR_FLUSH_START + i
+            lookup[h] = Hand.STRAIGHT_BEST + i
+            lookup[h | Hand.FLUSH_BIT] = Hand.STR_FLUSH_BEST + i
 
         # just do some first and then ill see how to generalize
 
@@ -200,10 +242,10 @@ class Hand(int):
                     fours = Hand.lookup_key([a, a, a, a, b], False)
                     full = Hand.lookup_key([a, a, a, b, b], False)
 
-                lookup[fours] = n + Hand.FOURS_START
-                lookup[fours | Hand.FLUSH_BIT] = n + Hand.FOURS_START
-                lookup[full] = n + Hand.FULL_START
-                lookup[full | Hand.FLUSH_BIT] = n + Hand.FULL_START
+                lookup[fours] = n + Hand.FOURS_BEST
+                lookup[fours | Hand.FLUSH_BIT] = n + Hand.FOURS_BEST
+                lookup[full] = n + Hand.FULL_BEST
+                lookup[full | Hand.FLUSH_BIT] = n + Hand.FULL_BEST
                 n -= 1
 
         # trips
@@ -218,8 +260,7 @@ class Hand(int):
                         continue
 
                     hand = Hand.lookup_key(sorted([a, a, a, b, c]), False)
-                    lookup[hand] = n + Hand.TRIPS_START
-                    lookup[hand | Hand.FLUSH_BIT] = n + Hand.TRIPS_START
+                    lookup[hand] = n + Hand.TRIPS_BEST
                     n -= 1
 
         # two pair
@@ -232,8 +273,7 @@ class Hand(int):
                         continue
 
                     hand = Hand.lookup_key(sorted([a, a, b, b, c]), False)
-                    lookup[hand] = n + Hand.TPAIR_START
-                    lookup[hand | Hand.FLUSH_BIT] = n + Hand.TPAIR_START
+                    lookup[hand] = n + Hand.TPAIR_BEST
                     n -= 1
 
         # pair
@@ -251,8 +291,7 @@ class Hand(int):
                             continue
 
                         hand = Hand.lookup_key(sorted([a, a, b, c, d]), False)
-                        lookup[hand] = n + Hand.PAIR_START
-                        lookup[hand | Hand.FLUSH_BIT] = n + Hand.PAIR_START
+                        lookup[hand] = n + Hand.PAIR_BEST
                         n -= 1
 
 
@@ -270,8 +309,8 @@ class Hand(int):
                                 continue
 
                             hand = Hand.lookup_key([e, d, c, b, a], False)
-                            lookup[hand] = n + Hand.HIGH_START
-                            lookup[hand | Hand.FLUSH_BIT] = n + Hand.FLUSH_START
+                            lookup[hand] = n + Hand.HIGH_BEST
+                            lookup[hand | Hand.FLUSH_BIT] = n + Hand.FLUSH_BEST
                             n -= 1
 
         return lookup
@@ -293,6 +332,58 @@ class Hand(int):
         instance = super().__new__(cls, value)
         instance.cards = cards
         return instance
+
+    def get_type(self) -> HandType:
+        for t, best in enumerate([
+            Hand.HIGH_BEST,
+            Hand.PAIR_BEST,
+            Hand.TPAIR_BEST,
+            Hand.TRIPS_BEST,
+            Hand.STRAIGHT_BEST,
+            Hand.FLUSH_BEST,
+            Hand.FULL_BEST,
+            Hand.FOURS_BEST,
+            Hand.STR_FLUSH_BEST
+        ]):
+            if self >= best:
+                return HandType(t)
+
+    def prettyprint(self) -> str:
+        '''Pretty print hand type'''
+        if self == 1:
+            return 'Royal Flush'
+
+        t = self.get_type()
+        tstr = t.to_str()
+        ranks = list(map(Card.get_rank, self.cards))
+
+        if t in (HandType.STRAIGHT, HandType.STR_FLUSH):
+            low = min(ranks)
+            high = max(ranks)
+            if low == Rank.TWO and high == Rank.ACE:
+                low = Rank.ACE
+                high = Rank.FIVE
+
+            return f'{low.prettyprint()} to {high.prettyprint()} {tstr}'
+
+        if t in (HandType.HIGH, HandType.FLUSH):
+            return f'{tstr} ({max(ranks).prettyprint()} High)'
+
+        counts = Counter(map(Card.get_rank, self.cards))
+
+        if t in (HandType.PAIR, HandType.TRIPS, HandType.FOURS):
+            prim_count = {HandType.PAIR: 2, HandType.TRIPS: 3, HandType.FOURS: 4}[t]
+            prim = [r for r, n in counts.items() if prim_count == 2][0]
+            second = max(filter(lambda c: c != prim, ranks))
+            return f'{prim.prettyprint()} {tstr} ({second.prettyprint()} High)'
+
+        if t == HandType.TPAIR:
+            pairs_rank = [r for r, n in counts.items() if n == 2]
+            return f'{pairs_rank[1].prettyprint()}, {pairs_rank[0].prettyprint()} {tstr}'
+        if t == HandType.FULL:
+            trip_rank = [r for r, n in counts.items() if n == 3][0]
+            pair_rank = [r for r, n in counts.items() if n == 2][0]
+            return f'{trip_rank.prettyprint()}, {pair_rank.prettyprint()} {tstr}'
 
     def __str__(self) -> str:
         return super().__str__() + ':' + str(self.cards)

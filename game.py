@@ -431,7 +431,7 @@ class Game:
     def __get_hand_rankings(self) -> List[Tuple[int, Hand]]:
         '''Returns tuple of (pl_id, highest_hand) sorted by strength of hand of all players'''
         return sorted([
-            (i, Hand.get_highest_hand(*self.community, *self._players[i].hand))
+            (i, Hand.get_best_hand(*self.community, *self._players[i].hand))
             for i in range(len(self._players))
             if self.pl_data[i].state != PlayerState.FOLDED
         ], key=lambda x: x[1], reverse=True)

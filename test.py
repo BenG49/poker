@@ -46,7 +46,7 @@ class TestHand(unittest.TestCase):
 
     def test_highest_hand(self):
         self.assertEqual(Hand([Card.new('Th'), Card.new('Jh'), Card.new('Qh'), Card.new('Kh'), Card.new('Ah')]),
-            Hand.get_highest_hand(Card.new('Th'), Card.new('Jh'), Card.new('Qh'), Card.new('Kh'), Card.new('Ah'), Card.new('2s'), Card.new('Ts')),
+            Hand.get_best_hand(Card.new('Th'), Card.new('Jh'), Card.new('Qh'), Card.new('Kh'), Card.new('Ah'), Card.new('2s'), Card.new('Ts')),
             'Found the wrong highest hand!')
 
 
