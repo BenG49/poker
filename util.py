@@ -243,7 +243,6 @@ class Hand(int):
                     full = Hand.lookup_key([a, a, a, b, b], False)
 
                 lookup[fours] = n + Hand.FOURS_BEST
-                lookup[fours | Hand.FLUSH_BIT] = n + Hand.FOURS_BEST
                 lookup[full] = n + Hand.FULL_BEST
                 n -= 1
 
@@ -331,6 +330,10 @@ class Hand(int):
         instance = super().__new__(cls, value)
         instance.cards = cards
         return instance
+
+    def rank_percentage(self) -> float:
+        '''What percent of random hands are worse than this hand'''
+        return 1 - self / Hand.HAND_COUNT
 
     def get_type(self) -> HandType:
         for t, best in enumerate([
