@@ -245,7 +245,6 @@ class Hand(int):
                 lookup[fours] = n + Hand.FOURS_BEST
                 lookup[fours | Hand.FLUSH_BIT] = n + Hand.FOURS_BEST
                 lookup[full] = n + Hand.FULL_BEST
-                lookup[full | Hand.FLUSH_BIT] = n + Hand.FULL_BEST
                 n -= 1
 
         # trips
