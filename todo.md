@@ -19,7 +19,7 @@
 	- ~~add helper methods~~
 	- ~~convert card to int~~
 	- add equity calculation
-- raise x vs raise _to_ x
+- ~~raise x vs raise _to_ x~~
 - add comprehensive tester
 - bot testing suite
 	- how should bots be tested?

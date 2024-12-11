@@ -32,7 +32,13 @@ class PlayerState(Enum):
         return self in (PlayerState.TO_CALL, PlayerState.MOVED)
 
 class Action(Enum):
-    '''Actions that a playaer can take'''
+    '''
+    Actions that a player can take:
+    CALL:   call current bet, or check if there has been no raise
+    RAISE:  raise by amt MORE THAN current bet
+    ALL_IN: post all of player's chips
+    FOLD:   fold
+    '''
     CALL = 0
     RAISE = 1
     ALL_IN = 2
@@ -351,6 +357,13 @@ class Game:
     @property
     def current_pl_pot(self) -> Pot:
         return self.pots[self.current_pl_data.latest_pot]
+
+    def raise_to(self, pl_id: int, raise_to: int) -> Optional[int]:
+        '''Convert from raising to the overall pot raise TO raising from the current bet.'''
+        current_raise = self.pots[self.pl_data[pl_id].latest_pot].chips_to_call(pl_id)
+        if current_raise > raise_to:
+            return None
+        return raise_to - current_raise
 
     ### ITERATORS ###
 
