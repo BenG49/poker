@@ -225,8 +225,6 @@ class Hand(int):
             lookup[h] = Hand.STRAIGHT_BEST + i
             lookup[h | Hand.FLUSH_BIT] = Hand.STR_FLUSH_BEST + i
 
-        # just do some first and then ill see how to generalize
-
         # fours, full house
         # aaaa b
         # aaa bb
@@ -391,3 +389,8 @@ class Hand(int):
         return super().__str__() + ':' + str(self.cards)
 
 Hand.LOOKUP = Hand.generate_lookup()
+
+if __name__ == '__main__':
+    ...
+    # for k, v in sorted(Hand.LOOKUP.items(), key=lambda kv: kv[1]):
+    #     print(f'{k}:{v}')

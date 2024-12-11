@@ -16,6 +16,12 @@ class TestUtils(unittest.TestCase):
     def test_itlen(self):
         self.assertEqual(it_len(map(lambda x: x**2, [0, 1, 2])), 3)
 
+class TestLUT(unittest.TestCase):
+    def test_coverage(self):
+        values = Hand.LOOKUP.values()
+        for i in range(1, Hand.HAND_COUNT + 1):
+            self.assertIn(i, values)
+
 class TestHand(unittest.TestCase):
     def test_hand_ranks(self):
         hands = [
