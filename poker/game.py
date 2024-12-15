@@ -239,13 +239,13 @@ class Game:
 
             elif action == Action.CALL:
                 bet = min(
-                    self.current_pl_pot.chips_to_call(self.current_pl_id),
+                    self.chips_to_call(self.current_pl_id),
                     self.current_pl_data.chips
                 )
                 self.current_pl_data.state = PlayerState.MOVED
 
             elif action == Action.RAISE:
-                bet = amt + self.current_pl_pot.chips_to_call(self.current_pl_id)
+                bet = amt + self.chips_to_call(self.current_pl_id)
                 self.current_pl_data.state = PlayerState.MOVED
 
             elif action == Action.ALL_IN:
@@ -253,7 +253,7 @@ class Game:
                 self.current_pl_data.state = PlayerState.ALL_IN
 
             if bet:
-                if bet > self.current_pl_pot.chips_to_call(self.current_pl_id):
+                if bet > self.chips_to_call(self.current_pl_id):
                     # make everyone else call this raise
                     it = self.active_players()
                     if it_len(self.active_players()) > 1:
@@ -364,12 +364,10 @@ class Game:
     def current_pl_pot(self) -> Pot:
         return self.pots[self.current_pl_data.latest_pot]
 
-    def raise_to(self, pl_id: int, raise_to: int) -> Optional[int]:
-        '''Convert from raising to the overall pot raise TO raising from the current bet.'''
-        current_raise = self.pots[self.pl_data[pl_id].latest_pot].chips_to_call(pl_id)
-        if current_raise > raise_to:
-            return None
-        return raise_to - current_raise
+    def chips_to_call(self, pl_id: int) -> int:
+        if self.pl_data[pl_id].state.active():
+            return self.pots[self.pl_data[pl_id].latest_pot].chips_to_call(pl_id)
+        return 0
 
     ### ITERATORS ###
 
@@ -463,3 +461,27 @@ class Game:
             4: BettingRound.TURN,
             5: BettingRound.RIVER
         }[len(self.community)]
+
+    def raise_to(self, pl_id: int, raise_to: int) -> Optional[int]:
+        '''Convert from raising to the overall pot raise TO raising from the current bet.'''
+        current_raise = self.chips_to_call(pl_id)
+        if current_raise > raise_to:
+            return None
+        return raise_to - current_raise
+
+    def get_moves(self, pl_id: int) -> List[Tuple[Action, Optional[int]]]:
+        '''Return all possible moves for player pl_id.'''
+        if not self.pl_data[pl_id].state.active():
+            return []
+
+        out = [(Action.FOLD, None)]
+
+        free_chips = self.pl_data[pl_id].chips - self.chips_to_call(pl_id)
+        if free_chips >= 0:
+            out.append((Action.CALL, None))
+            if free_chips > 0:
+                out.append((Action.ALL_IN, None))
+                for i in range(1, free_chips):
+                    out.append((Action.RAISE, i))
+
+        return out

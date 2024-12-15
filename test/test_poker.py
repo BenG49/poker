@@ -169,5 +169,30 @@ class TestGame(unittest.TestCase):
 
         self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [100, 99, 101])
 
+    def test_gen_moves(self):
+        game = Game(100)
+        game.add_player(bots.Checker())
+        game.add_player(bots.Checker())
+        game.init_hand()
+        self.assertEqual(len(game.get_moves(0)), 100)
+
+        game = Game(2)
+        game.add_player(bots.Checker())
+        game.add_player(bots.Checker())
+        game.init_hand()
+        self.assertEqual(len(game.get_moves(0)), 2)
+
+        game = Game(3)
+        game.add_player(bots.Checker())
+        game.add_player(bots.Checker())
+        game.init_hand()
+        self.assertEqual(len(game.get_moves(0)), 3)
+
+        game = Game(4)
+        game.add_player(bots.Checker())
+        game.add_player(bots.Checker())
+        game.init_hand()
+        self.assertEqual(len(game.get_moves(0)), 4)
+
 if __name__ == '__main__':
     unittest.main()

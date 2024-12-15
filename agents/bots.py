@@ -11,9 +11,9 @@ class Raiser(Player):
         self.min_raise = min_raise
 
     def move(self, game: Game) -> Tuple[Action, Optional[int]]:
-        if game.current_pl_data.chips < game.current_pl_pot.chips_to_call(self.id):
+        if game.current_pl_data.chips < game.chips_to_call(self.id):
             return Action.ALL_IN, None
-        return Action.RAISE, min(self.min_raise, game.current_pl_data.chips - game.current_pl_pot.chips_to_call(self.id))
+        return Action.RAISE, min(self.min_raise, game.current_pl_data.chips - game.chips_to_call(self.id))
 
 class Checker(Player):
     def move(self, game: Game) -> Tuple[Action, Optional[int]]:
@@ -33,7 +33,7 @@ class TerminalPlayer(Player):
         print('Chips:', ', '.join(list(map(lambda p: f'P{p}:(${game.pl_data[p].chips}, bet ${game.current_pl_pot.bets.get(p, 0)})', game.pl_iter(skip_start=True)))))
         print('Community:', game.community)
         print('Your hand:', self.hand)
-        print(f'Chips to call: ${game.current_pl_pot.chips_to_call(self.id)}')
+        print(f'Chips to call: ${game.chips_to_call(self.id)}')
 
         action = input('Choose action from: call, all in, raise, or fold: ').lower()[0]
         while action not in 'carf':
