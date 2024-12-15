@@ -1,4 +1,4 @@
-from game import Game, GameState
+from .game import Game, GameState
 
 class BotTUI:
     def __init__(self, game: Game, silent: bool=False):

@@ -1,9 +1,9 @@
 '''
 main.py
 '''
-import bots
-from game import Game
-from runner import BotTUI
+import agents.bots as bots
+from poker.game import Game
+from poker.runner import BotTUI
 
 def main():
     game = Game(buy_in=1000, bigblind=10)

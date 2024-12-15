@@ -403,8 +403,3 @@ class Hand(int):
         return super().__str__() + ':' + str(self.cards)
 
 Hand.LOOKUP = Hand.generate_lookup()
-
-if __name__ == '__main__':
-    ...
-    # for k, v in sorted(Hand.LOOKUP.items(), key=lambda kv: kv[1]):
-    #     print(f'{k}:{v}')

@@ -2,8 +2,8 @@
 Stores all poker bots
 '''
 from typing import List, Optional, Tuple
-from game import Action, BettingRound, Game, Player
-from util import Card, Deck, Hand, HandType, Rank, same
+from poker.game import Action, BettingRound, Game, Player
+from poker.util import Card, Deck, Hand, HandType, Rank, same
 
 class Raiser(Player):
     def __init__(self, min_raise: int):
