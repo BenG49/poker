@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Iterator, List, Dict, Tuple, Optional, Self
 
-from .util import Card, Deck, Hand, it_len, same
+from .history import GameHistory
+from .util import Action, BettingRound, Card, Deck, Hand, it_len, same
 
 class InvalidMoveError(ValueError): ...
 
@@ -30,35 +31,6 @@ class PlayerState(Enum):
     def active(self) -> bool:
         '''True if player will still make moves in future betting rounds'''
         return self in (PlayerState.TO_CALL, PlayerState.MOVED)
-
-class Action(Enum):
-    '''
-    Actions that a player can take:
-    CALL:   call current bet, or check if there has been no raise
-    RAISE:  raise by amt MORE THAN current bet
-    ALL_IN: post all of player's chips
-    FOLD:   fold
-    '''
-    CALL = 0
-    RAISE = 1
-    ALL_IN = 2
-    FOLD = 3
-
-    def to_str(self, amt: Optional[int]) -> str:
-        if self == Action.CALL:
-            return 'called'
-        if self == Action.RAISE:
-            return f'raised ${amt}'
-        if self == Action.ALL_IN:
-            return 'went all in'
-        if self == Action.FOLD:
-            return 'folded'
-
-class BettingRound(Enum):
-    PREFLOP = 0
-    FLOP = 1
-    TURN = 2
-    RIVER = 3
 
 class GameState(Enum):
     OVER = 0
@@ -177,6 +149,7 @@ class Game:
         self.pots: List[Pot] = [Pot(0, {})]
 
         ### PRIVATE ###
+        self._history: GameHistory = GameHistory()
         self._players: List[Player] = []
         self._deck: Deck = Deck()
 
@@ -194,8 +167,7 @@ class Game:
         if it_len(self.in_hand_players()) < 2:
             self.state = GameState.OVER
             return
-        else:
-            self.state = GameState.RUNNING
+        self.state = GameState.RUNNING
 
         # blinds
         if len(self._players) == 2:
@@ -203,8 +175,26 @@ class Game:
         else:
             self.sb_id = next(self.in_hand_players(start=self.button_id, skip_start=True))
         self.bb_id = next(self.in_hand_players(start=self.sb_id, skip_start=True))
-        self.__bet(self.sb_id, min(self.small_blind, self.pl_data[self.sb_id].chips))
-        self.__bet(self.bb_id, min(self.big_blind, self.pl_data[self.bb_id].chips))
+
+        # small blind
+        sb_amt = min(self.small_blind, self.pl_data[self.sb_id].chips)
+        self.__bet(self.sb_id, sb_amt)
+        self._history.add_action(
+            BettingRound.PREFLOP,
+            self.sb_id,
+            (Action.ALL_IN, None) if sb_amt == self.pl_data[self.sb_id].chips
+                else (Action.RAISE, sb_amt)
+        )
+
+        # big blind
+        bb_amt = min(self.big_blind, self.pl_data[self.bb_id].chips)
+        self.__bet(self.bb_id, bb_amt)
+        self._history.add_action(
+            BettingRound.PREFLOP,
+            self.bb_id,
+            (Action.ALL_IN, None) if bb_amt == self.pl_data[self.bb_id].chips
+                else (Action.RAISE, bb_amt - sb_amt)
+        )
 
         # deal hands
         self.community = []
@@ -214,6 +204,8 @@ class Game:
         for _ in range(2):
             for h in [(i + self.sb_id) % len(self._players) for i in range(len(self._players))]:
                 self._players[h].hand.append(self._deck.deal())
+
+        self._history.add_hands([pl.hand for pl in self._players])
 
         self.current_pl_id = next(self.in_hand_players(start=self.bb_id, skip_start=True))
 
@@ -228,6 +220,7 @@ class Game:
 
         if self.current_pl_data.state.active():
             action, amt = self._players[self.current_pl_id].move(self)
+            self._history.add_action(self.betting_round(), self.current_pl_id, (action, amt))
             bet = None
 
             if amt is not None and amt < 0:
@@ -297,9 +290,9 @@ class Game:
         if self.betting_round() != BettingRound.RIVER:
             self._deck.burn()
             if self.betting_round() == BettingRound.PREFLOP:
-                self.community.extend(self._deck.deal(3))
+                self.community.extend(self._history.deal(self._deck.deal(3)))
             else:
-                self.community.append(self._deck.deal())
+                self.community.append(self._history.deal(self._deck.deal()))
 
     def end_hand(self):
         '''Called at the end of a hand (showdown or one player remaining)'''
@@ -308,26 +301,24 @@ class Game:
         def hand(t: Tuple[int, Hand]):
             return t[1]
 
-        # if hand was ended before river, deal rest of community
-        while len(self.community) < 5:
-            self._deck.burn()
-            if self.betting_round() == BettingRound.PREFLOP:
-                self.community.extend(self._deck.deal(3))
-            else:
-                self.community.append(self._deck.deal())
+        self._history.end_hand()
 
-        rankings = self.__get_hand_rankings()
-        w = [r for r in rankings if r[1] == rankings[-1][1]]
-        if len(w) == 1:
-            print(f'Player {w[0][0]} wins with {w[0][1].prettyprint()}')
+        # hand was ended before river, make the one person left win
+        if len(self.community) < 5:
+            rankings = [
+                (self._players[pl].id, -1 if self.pl_data[pl].state.active() else 0)
+                for pl in self.pl_iter(exclude_states=(PlayerState.OUT,))
+            ]
+            rankings.sort(key=hand, reverse=True)
         else:
-            print(f'Players {", ".join(map(lambda x: str(x[0]), w))} wins with {w[0][1].prettyprint()}')
+            rankings = self.__get_hand_rankings()
 
-        for pot in self.pots:
+        for pot_n, pot in enumerate(self.pots):
             pot_hands = list(filter(lambda x: pl_id(x) in pot.players(), rankings))
             winners = [pl_id(pl) for pl in pot_hands if hand(pl) == hand(pot_hands[-1])]
             win_value = pot.total() // len(winners)
             remainder = pot.total() % len(winners)
+            self._history.add_result(pot_n, pot.total(), winners, rankings[-1][1])
 
             # give remainder to first player past button
             if remainder != 0:

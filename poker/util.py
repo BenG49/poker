@@ -5,7 +5,7 @@ from collections import Counter
 from enum import Enum, IntEnum
 from itertools import combinations
 from random import shuffle
-from typing import Dict, List, Iterable, Self
+from typing import Dict, List, Iterable, Optional, Self
 
 def same(it: Iterable) -> bool:
     '''True if all items in iterable are equal'''
@@ -19,6 +19,35 @@ def same(it: Iterable) -> bool:
 def it_len(it: Iterable) -> int:
     '''Loops through it to find length'''
     return sum(1 for _ in it)
+
+class Action(Enum):
+    '''
+    Actions that a player can take:
+    CALL:   call current bet, or check if there has been no raise
+    RAISE:  raise by amt MORE THAN current bet
+    ALL_IN: post all of player's chips
+    FOLD:   fold
+    '''
+    CALL = 0
+    RAISE = 1
+    ALL_IN = 2
+    FOLD = 3
+
+    def to_str(self, amt: Optional[int]) -> str:
+        if self == Action.CALL:
+            return 'called'
+        if self == Action.RAISE:
+            return f'raised ${amt}'
+        if self == Action.ALL_IN:
+            return 'went all in'
+        if self == Action.FOLD:
+            return 'folded'
+
+class BettingRound(Enum):
+    PREFLOP = 0
+    FLOP = 1
+    TURN = 2
+    RIVER = 3
 
 class Suit(IntEnum):
     '''Suit enum'''
@@ -111,7 +140,7 @@ class Deck:
         ranks = [Rank.ACE] + list(range(Rank.TWO, Rank.ACE))
         self.deck = [Card(Rank(r), Suit(s)) for s in iter(Suit) for r in ranks]
 
-    def deal(self, n: int=1):
+    def deal(self, n: int=1) -> Card | List[Card]:
         '''Deal n cards, put those cards at the back of the deck'''
         assert n >= 1
 

@@ -4,9 +4,9 @@ Unit testing for util.py and game.py
 import unittest
 import random
 
+from agents import bots
 from poker.util import Hand, Card, it_len, same
 from poker.game import Game
-import agents.bots as bots
 
 class TestUtils(unittest.TestCase):
     def test_same(self):
