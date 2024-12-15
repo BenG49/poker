@@ -127,7 +127,10 @@ class Deck:
         '''Shuffle internal card list'''
         shuffle(self.deck)
 
-class HandType(Enum):
+    def __iter__(self):
+        return iter(self.deck)
+
+class HandType(IntEnum):
     HIGH = 0
     PAIR = 1
     TPAIR = 2
@@ -137,6 +140,10 @@ class HandType(Enum):
     FULL = 6
     FOURS = 7
     STR_FLUSH = 8
+    ROYAL_FLUSH = 9
+
+    def is_flush(self) -> bool:
+        return self in (HandType.FLUSH, HandType.STR_FLUSH, HandType.ROYAL_FLUSH)
 
     def to_str(self) -> str:
         return [
@@ -148,7 +155,8 @@ class HandType(Enum):
             'Flush',
             'Full House',
             'Four of a Kind',
-            'Straight Flush'
+            'Straight Flush',
+            'Royal Flush'
         ][self.value]
 
 class Hand(int):
@@ -156,7 +164,10 @@ class Hand(int):
     @staticmethod
     def get_best_hand(*cards: List[Card]) -> Self:
         '''Finds highest hand from list of cards'''
+        if len(cards) == 1:
+            cards = cards[0]
         assert len(cards) >= 5
+
         return min(map(Hand, combinations(cards, 5)))
 
     HAND_COUNT = 7462
@@ -334,6 +345,9 @@ class Hand(int):
         return 1 - self / Hand.HAND_COUNT
 
     def get_type(self) -> HandType:
+        if self == 1:
+            return HandType.ROYAL_FLUSH
+
         for t, best in enumerate([
             Hand.HIGH_BEST,
             Hand.PAIR_BEST,
@@ -350,12 +364,12 @@ class Hand(int):
 
     def prettyprint(self) -> str:
         '''Pretty print hand type'''
-        if self == 1:
-            return 'Royal Flush'
-
         t = self.get_type()
         tstr = t.to_str()
         ranks = list(map(Card.get_rank, self.cards))
+
+        if t == HandType.ROYAL_FLUSH:
+            return tstr
 
         if t in (HandType.STRAIGHT, HandType.STR_FLUSH):
             low = min(ranks)
@@ -373,7 +387,7 @@ class Hand(int):
 
         if t in (HandType.PAIR, HandType.TRIPS, HandType.FOURS):
             prim_count = {HandType.PAIR: 2, HandType.TRIPS: 3, HandType.FOURS: 4}[t]
-            prim = [r for r, n in counts.items() if prim_count == 2][0]
+            prim = [r for r, n in counts.items() if n == prim_count][0]
             second = max(filter(lambda c: c != prim, ranks))
             return f'{prim.prettyprint()} {tstr} ({second.prettyprint()} High)'
 

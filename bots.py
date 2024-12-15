@@ -1,8 +1,9 @@
 '''
 Stores all poker bots
 '''
-from typing import Optional, Tuple
-from game import Action, Game, Player
+from typing import List, Optional, Tuple
+from game import Action, BettingRound, Game, Player
+from util import Card, Deck, Hand, HandType, Rank, same
 
 class Raiser(Player):
     def __init__(self, min_raise: int):
@@ -49,3 +50,49 @@ class TerminalPlayer(Player):
         amt = input('Amount to raise: ').strip()
 
         return action, int(amt)
+
+class EquityBot(Player):
+    @staticmethod
+    def equity(betting_round: BettingRound, hand: List[Card], community: List[Card]) -> float:
+        if betting_round == BettingRound.PREFLOP:
+            def value(r: Rank) -> int:
+                return r + 3 if r == Rank.ACE else r + 2
+            ranks = list(map(Card.get_rank, hand))
+            eq = 2 * value(max(ranks)) + value(min(ranks)) + 20
+            if same(ranks):
+                eq += 44
+            if same(map(Card.get_suit, hand)):
+                eq += 2
+            return eq / 100.0
+
+        # brute force outs
+        combined = hand + community
+        current_best = Hand.get_best_hand(combined)
+        outs = set()
+
+        for card in iter(Deck()):
+            if card in combined:
+                continue
+
+            new_best = Hand.get_best_hand(*combined, card)
+
+            # set minimum hand to 'win' at three of a kind
+            if new_best.get_type() > current_best.get_type() and \
+               new_best.get_type() >= HandType.TPAIR:
+                outs.add(card)
+
+        return 2 * len(outs) / 100.0
+
+    def pot_odds(self, game: Game) -> float:
+        self_pot = game.pots[game.pl_data[self.id].latest_pot]
+        total = self_pot.total() + self_pot.chips_to_call(self.id)
+        return self_pot.chips_to_call(self.id) / total
+
+    def move(self, game: Game) -> Tuple[Action, Optional[int]]:
+        eq = EquityBot.equity(game.betting_round(), self.hand, game.community)
+        po = self.pot_odds(game)
+
+        if eq < po:
+            return Action.FOLD, None
+
+        return Action.CALL, None

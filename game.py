@@ -317,6 +317,12 @@ class Game:
                 self.community.append(self._deck.deal())
 
         rankings = self.__get_hand_rankings()
+        w = [r for r in rankings if r[1] == rankings[-1][1]]
+        if len(w) == 1:
+            print(f'Player {w[0][0]} wins with {w[0][1].prettyprint()}')
+        else:
+            print(f'Players {", ".join(map(lambda x: str(x[0]), w))} wins with {w[0][1].prettyprint()}')
+
         for pot in self.pots:
             pot_hands = list(filter(lambda x: pl_id(x) in pot.players(), rankings))
             winners = [pl_id(pl) for pl in pot_hands if hand(pl) == hand(pot_hands[-1])]

@@ -1,3 +1,4 @@
+# TODO
 - clean up util.Hand.\_\_init\_\_
 - ~~use more iterator methods~~
 - ~~separate deck into class~~
@@ -24,3 +25,13 @@
 - bot testing suite
 	- how should bots be tested?
 		- dataset of hand histories?
+
+## Bot
+- Monte Carlo Counterfactual Regret Minimization
+	- figure out what needs to be added to api to extend history, infoset
+		- list all moves (all actions)
+	```python
+	class CFR:
+		def walk_tree():
+			...
+	```
