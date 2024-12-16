@@ -3,7 +3,8 @@ Datastructure to store poker game history, works with Game from poker.game.
 '''
 from typing import List, Optional, Tuple
 
-from poker.util import Action, BettingRound, Card, Hand
+from poker.hand import Hand, prettyprint
+from poker.util import Action, BettingRound, Card
 
 class GameHistory:
     '''Datastructure to store poker game history, works with Game from poker.game'''
@@ -25,7 +26,7 @@ class GameHistory:
             ', '.join(map(str, results[2])),
             results[0],
             results[1],
-            results[3].prettyprint() if isinstance(results[3], Hand) else str(results[3])
+            prettyprint(results[3]) if isinstance(results[3], Hand) else str(results[3])
         )
 
     def __init__(self):

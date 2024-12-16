@@ -6,8 +6,9 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Iterator, List, Dict, Tuple, Optional, Self
 
+from .hand import Hand, eval_hand
 from .history import GameHistory
-from .util import Action, BettingRound, Card, Deck, Hand, it_len, same
+from .util import Action, BettingRound, Card, Deck, it_len, same
 
 class InvalidMoveError(ValueError): ...
 

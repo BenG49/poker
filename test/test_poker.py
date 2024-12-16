@@ -5,7 +5,9 @@ import unittest
 import random
 
 from agents import bots
-from poker.util import Hand, Card, it_len, same
+from poker import hand
+from poker.hand import eval_hand
+from poker.util import Card, it_len, same
 from poker.game import Game
 
 class TestUtils(unittest.TestCase):
@@ -18,23 +20,23 @@ class TestUtils(unittest.TestCase):
 
 class TestLUT(unittest.TestCase):
     def test_coverage(self):
-        values = Hand.LOOKUP.values()
-        for i in range(1, Hand.HAND_COUNT + 1):
+        values = hand.LOOKUP.values()
+        for i in range(1, hand.HAND_COUNT + 1):
             self.assertIn(i, values)
 
 class TestHand(unittest.TestCase):
     def test_hand_ranks(self):
         hands = [
-            Hand([Card.new('Tc'), Card.new('7h'), Card.new('4d'), Card.new('Kc'), Card.new('2s')]),
-            Hand([Card.new('Kc'), Card.new('Kh'), Card.new('7d'), Card.new('2c'), Card.new('5s')]),
-            Hand([Card.new('Kc'), Card.new('Kh'), Card.new('7d'), Card.new('7c'), Card.new('5s')]),
-            Hand([Card.new('Kc'), Card.new('Kh'), Card.new('Kd'), Card.new('7c'), Card.new('5s')]),
-            Hand([Card.new('Ac'), Card.new('2h'), Card.new('3d'), Card.new('4c'), Card.new('5s')]),
-            Hand([Card.new('Kc'), Card.new('Qc'), Card.new('9c'), Card.new('8c'), Card.new('2c')]),
-            Hand([Card.new('Kc'), Card.new('Kh'), Card.new('Kd'), Card.new('7c'), Card.new('7s')]),
-            Hand([Card.new('6s'), Card.new('6d'), Card.new('6h'), Card.new('6c'), Card.new('Ks')]),
-            Hand([Card.new('2s'), Card.new('3s'), Card.new('4s'), Card.new('5s'), Card.new('6s')]),
-            Hand([Card.new('Th'), Card.new('Jh'), Card.new('Qh'), Card.new('Kh'), Card.new('Ah')])
+            eval_hand([Card.new('Tc'), Card.new('7h'), Card.new('4d'), Card.new('Kc'), Card.new('2s')]),
+            eval_hand([Card.new('Kc'), Card.new('Kh'), Card.new('7d'), Card.new('2c'), Card.new('5s')]),
+            eval_hand([Card.new('Kc'), Card.new('Kh'), Card.new('7d'), Card.new('7c'), Card.new('5s')]),
+            eval_hand([Card.new('Kc'), Card.new('Kh'), Card.new('Kd'), Card.new('7c'), Card.new('5s')]),
+            eval_hand([Card.new('Ac'), Card.new('2h'), Card.new('3d'), Card.new('4c'), Card.new('5s')]),
+            eval_hand([Card.new('Kc'), Card.new('Qc'), Card.new('9c'), Card.new('8c'), Card.new('2c')]),
+            eval_hand([Card.new('Kc'), Card.new('Kh'), Card.new('Kd'), Card.new('7c'), Card.new('7s')]),
+            eval_hand([Card.new('6s'), Card.new('6d'), Card.new('6h'), Card.new('6c'), Card.new('Ks')]),
+            eval_hand([Card.new('2s'), Card.new('3s'), Card.new('4s'), Card.new('5s'), Card.new('6s')]),
+            eval_hand([Card.new('Th'), Card.new('Jh'), Card.new('Qh'), Card.new('Kh'), Card.new('Ah')])
         ]
 
         assert hands == [
@@ -51,8 +53,8 @@ class TestHand(unittest.TestCase):
         ]
 
     def test_highest_hand(self):
-        self.assertEqual(Hand([Card.new('Th'), Card.new('Jh'), Card.new('Qh'), Card.new('Kh'), Card.new('Ah')]),
-            Hand.get_best_hand(Card.new('Th'), Card.new('Jh'), Card.new('Qh'), Card.new('Kh'), Card.new('Ah'), Card.new('2s'), Card.new('Ts')),
+        self.assertEqual(eval_hand([Card.new('Th'), Card.new('Jh'), Card.new('Qh'), Card.new('Kh'), Card.new('Ah')]),
+            eval_hand([Card.new('Th'), Card.new('Jh'), Card.new('Qh'), Card.new('Kh'), Card.new('Ah'), Card.new('2s'), Card.new('Ts')]),
             'Found the wrong highest hand!')
 
 
