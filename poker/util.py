@@ -5,7 +5,7 @@ from collections import Counter
 from enum import Enum, IntEnum
 from itertools import combinations
 from random import shuffle
-from typing import Dict, List, Iterable, Optional, Self
+from typing import Dict, List, Iterable, Optional
 
 def same(it: Iterable) -> bool:
     '''True if all items in iterable are equal'''
@@ -57,7 +57,7 @@ class Suit(IntEnum):
     CLUBS = 3
 
     @staticmethod
-    def from_str(s: str):
+    def from_str(s: str) -> 'Suit':
         '''Create Suit from string'''
         return Suit('shdc'.index(s))
 
@@ -82,7 +82,7 @@ class Rank(IntEnum):
     ACE = 12
 
     @staticmethod
-    def from_str(s: str):
+    def from_str(s: str) -> 'Rank':
         '''Create Rank from string'''
         return Rank('23456789TJQKA'.index(s))
 
@@ -116,16 +116,16 @@ class Card(int):
         return instance
 
     @staticmethod
-    def new(s: str):
+    def new(s: str) -> 'Card':
         '''Create card from string, ex. Kh (king of hearts)'''
         assert len(s) == 2
         return Card(Rank.from_str(s[0]), Suit.from_str(s[1]))
 
-    def get_rank(self):
+    def get_rank(self) -> Rank:
         '''Rank getter'''
         return self.rank
 
-    def get_suit(self):
+    def get_suit(self) -> Suit:
         '''Suit getter'''
         return self.suit
 
@@ -191,7 +191,7 @@ class HandType(IntEnum):
 class Hand(int):
     '''5-card hand class, only stores hand value, not list of Cards'''
     @staticmethod
-    def get_best_hand(*cards: List[Card]) -> Self:
+    def get_best_hand(*cards: List[Card]) -> 'Hand':
         '''Finds highest hand from list of cards'''
         if len(cards) == 1:
             cards = cards[0]
