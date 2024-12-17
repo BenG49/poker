@@ -6,19 +6,21 @@ from typing import List, Optional, Tuple
 from poker.hand import Hand, prettyprint
 from poker.util import Action, BettingRound, Card
 
+Move = Tuple[Action, Optional[int]]
+
 class GameHistory:
     '''Datastructure to store poker game history, works with Game from poker.game'''
 
-    # round, player id, action, amt
+    # round, player id, move
     # None is end of round specifier
-    ActionTuple = Optional[Tuple[BettingRound, int, Action, Optional[int]]]
+    ActionTuple = Optional[Tuple[BettingRound, int, Move]]
     # pot id, pot total, winner list, best hand (-1 if win from fold)
     WinTuple = Tuple[int, int, List[int], Hand]
 
     @staticmethod
     def action_str(action: ActionTuple) -> str:
         '''Converts action tuple to string'''
-        return f'P{action[1]} {action[2].to_str(action[3])}'
+        return f'P{action[1]} {action[2][0].to_str(action[2][1])}'
 
     @staticmethod
     def results_str(results: WinTuple) -> str:
@@ -36,12 +38,12 @@ class GameHistory:
         self._hands: List[List[Card]] = []
         self.results: List[GameHistory.WinTuple] = []
 
-    def add_action(self, bround: BettingRound, player: int, action: Tuple[Action, Optional[int]]):
+    def add_action(self, bround: BettingRound, player: int, action: Move):
         '''Add player action to history'''
         self.actions.append((
             bround,
             player,
-            *action
+            action
         ))
 
     def deal(self, cards) -> Card | List[Card]:

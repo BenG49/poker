@@ -1,8 +1,8 @@
 '''
 Stores all poker bots
 '''
-from typing import List, Optional, Tuple
-from poker.game import Action, BettingRound, Game, Player
+from typing import List
+from poker.game import Action, BettingRound, Game, Move, Player
 from poker.hand import HandType, eval_hand, hand_type
 from poker.util import Card, Deck, Rank, same
 
@@ -11,25 +11,25 @@ class Raiser(Player):
         super().__init__()
         self.min_raise = min_raise
 
-    def move(self, game: Game) -> Tuple[Action, Optional[int]]:
+    def move(self, game: Game) -> Move:
         if game.current_pl_data.chips < game.chips_to_call(self.id):
             return Action.ALL_IN, None
         return Action.RAISE, min(self.min_raise, game.current_pl_data.chips - game.chips_to_call(self.id))
 
 class Checker(Player):
-    def move(self, game: Game) -> Tuple[Action, Optional[int]]:
+    def move(self, game: Game) -> Move:
         return Action.CALL, None
 
 class Folder(Player):
-    def move(self, game: Game) -> Tuple[Action, Optional[int]]:
+    def move(self, game: Game) -> Move:
         return Action.FOLD, None
 
 class AllIn(Player):
-    def move(self, game: Game) -> Tuple[Action, Optional[int]]:
+    def move(self, game: Game) -> Move:
         return Action.ALL_IN, None
 
 class TerminalPlayer(Player):
-    def move(self, game: Game) -> Tuple[Action, Optional[int]]:
+    def move(self, game: Game) -> Move:
         print('Your turn.')
         print('Chips:', ', '.join(list(map(lambda p: f'P{p}:(${game.pl_data[p].chips}, bet ${game.current_pl_pot.bets.get(p, 0)})', game.pl_iter(skip_start=True)))))
         print('Community:', game.community)
@@ -89,7 +89,7 @@ class EquityBot(Player):
         total = self_pot.total() + self_pot.chips_to_call(self.id)
         return self_pot.chips_to_call(self.id) / total
 
-    def move(self, game: Game) -> Tuple[Action, Optional[int]]:
+    def move(self, game: Game) -> Move:
         eq = EquityBot.equity(game.betting_round(), self.hand, game.community)
         po = self.pot_odds(game)
 

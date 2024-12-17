@@ -10,6 +10,9 @@ from .hand import Hand, eval_hand
 from .history import GameHistory
 from .util import Action, BettingRound, Card, Deck, it_len, same
 
+Move = Tuple[Action, Optional[int]]
+
+
 class InvalidMoveError(ValueError): ...
 
 
@@ -126,7 +129,7 @@ class Player(ABC):
         self.id = None
 
     @abstractmethod
-    def move(self, game) -> Tuple[Action, Optional[int]]:
+    def move(self, game) -> Move:
         ...
 
 class Game:
@@ -461,7 +464,7 @@ class Game:
             return None
         return raise_to - current_raise
 
-    def get_moves(self, pl_id: int) -> List[Tuple[Action, Optional[int]]]:
+    def get_moves(self, pl_id: int) -> List[Move]:
         '''Return all possible moves for player pl_id.'''
         if not self.pl_data[pl_id].state.active():
             return []
