@@ -3,7 +3,7 @@ Datastructure to store poker game history, works with Game from poker.game.
 '''
 from typing import List, Optional, Tuple
 
-from poker.hand import Hand, prettyprint
+from poker.hand import Hand, print_hand
 from poker.util import Action, BettingRound, Card
 
 Move = Tuple[Action, Optional[int]]
@@ -26,7 +26,7 @@ class GameHistory:
     def results_str(results: WinTuple) -> str:
         '''Converts results tuple to string'''
         winners = ', '.join(map(str, results[2]))
-        result = prettyprint(results[3]) if results[3] > 0 else 'others folding'
+        result = print_hand(results[3]) if results[3] > 0 else 'others folding'
         return f'Players [{winners}] win (Pot {results[0]}, ${results[1]}) with {result}'
 
     def __init__(self):

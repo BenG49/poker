@@ -78,7 +78,7 @@ def eval_hand(cards: List[Card]) -> Hand:
     if len(cards) == 1:
         cards = cards[0]
     if len(cards) == 5:
-        return lookup(list(cards))
+        return hand_lookup(list(cards))
 
     assert len(cards) > 5
 
@@ -213,14 +213,14 @@ def _generate_lookup() -> Dict[int, int]:
 
     return output, strings
 
-def lookup(cards: List[Card]) -> int:
+def hand_lookup(cards: List[Card]) -> int:
     '''Access hand ranking lookup table.'''
     flush = same(map(Card.get_suit, cards))
     cards.sort(key=Card.get_rank)
 
     return LOOKUP.get(_lookup_key(cards, flush))
 
-def rank_percentage(hand: Hand) -> float:
+def hand_rank_pct(hand: Hand) -> float:
     '''What percent of random hands are worse than this hand'''
     return 1 - hand / HAND_COUNT
 
@@ -243,7 +243,7 @@ def hand_type(hand: Hand) -> HandType:
         if hand >= best:
             return HandType(t)
 
-def prettyprint(hand: Hand) -> str:
+def print_hand(hand: Hand) -> str:
     '''Pretty print hand type'''
     return STRINGS[hand]
 
