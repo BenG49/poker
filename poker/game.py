@@ -212,16 +212,15 @@ class Game:
         self.current_pl_id = next(self.in_hand_players(start=self.bb_id, skip_start=True))
 
     def step_move(self):
-        '''
-        Accept move from one player, handle resulting game state
+        '''Accept move from current player's entry in _players'''
+        self.accept_move(*self._players[self.current_pl_id].move(self))
 
-        Basically step state machine forward with player move from player as input
-        '''
+    def accept_move(self, action: Action, amt: int=None):
+        '''Accept move, handle resulting game state'''
         if self.state != GameState.RUNNING:
             return
 
         if self.current_pl_data.state.active():
-            action, amt = self._players[self.current_pl_id].move(self)
             self.history.add_action(self.betting_round(), self.current_pl_id, (action, amt))
             bet = None
 
