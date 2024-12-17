@@ -22,12 +22,9 @@ class GameHistory:
     @staticmethod
     def results_str(results: WinTuple) -> str:
         '''Converts results tuple to string'''
-        return 'Players [{}] win (Pot {}, ${}) with {}'.format(
-            ', '.join(map(str, results[2])),
-            results[0],
-            results[1],
-            prettyprint(results[3]) if isinstance(results[3], Hand) else str(results[3])
-        )
+        winners = ', '.join(map(str, results[2]))
+        result = prettyprint(results[3]) if isinstance(results[3], Hand) else str(results[3])
+        return f'Players [{winners}] win (Pot {results[0]}, ${results[1]}) with {result}'
 
     def __init__(self):
         self.actions: List[GameHistory.ActionTuple] = []
@@ -35,7 +32,7 @@ class GameHistory:
         # flattened list of hands
         # ex. 2 players with [Kh, Kc] and [Qh, 4s]
         # [Kh, Kc, Qh, 4s]
-        self.hands: List[List[Card]] = []
+        self._hands: List[List[Card]] = []
         self.results: List[GameHistory.WinTuple] = []
 
     def add_action(self, bround: BettingRound, player: int, action: Tuple[Action, Optional[int]]):
@@ -56,7 +53,7 @@ class GameHistory:
 
     def add_hands(self, hands: List[List[Card]]):
         '''Add new round's hands to history'''
-        self.hands.append(tuple(card for hand in hands for card in hand))
+        self._hands.append(tuple(card for hand in hands for card in hand))
 
     def end_hand(self):
         '''Call before calling add_result, after the end of the hand, before processing pots'''
@@ -72,7 +69,7 @@ class GameHistory:
         card_idx = 0
         move_idx = 0
         last_round = BettingRound.RIVER
-        for hand, result in zip(self.hands, self.results):
+        for hand, result in zip(self._hands, self.results):
             out += 'Hands: ' + str(list(zip(hand[::2], hand[1::2]))) + '\n'
 
             round_start = True

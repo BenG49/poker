@@ -149,8 +149,9 @@ class Game:
         self.community: List[Card] = []
         self.pots: List[Pot] = [Pot(0, {})]
 
+        self.history: GameHistory = GameHistory()
+
         ### PRIVATE ###
-        self._history: GameHistory = GameHistory()
         self._players: List[Player] = []
         self._deck: Deck = Deck()
 
@@ -180,7 +181,7 @@ class Game:
         # small blind
         sb_amt = min(self.small_blind, self.pl_data[self.sb_id].chips)
         self.__bet(self.sb_id, sb_amt)
-        self._history.add_action(
+        self.history.add_action(
             BettingRound.PREFLOP,
             self.sb_id,
             (Action.ALL_IN, None) if sb_amt == self.pl_data[self.sb_id].chips
@@ -190,7 +191,7 @@ class Game:
         # big blind
         bb_amt = min(self.big_blind, self.pl_data[self.bb_id].chips)
         self.__bet(self.bb_id, bb_amt)
-        self._history.add_action(
+        self.history.add_action(
             BettingRound.PREFLOP,
             self.bb_id,
             (Action.ALL_IN, None) if bb_amt == self.pl_data[self.bb_id].chips
@@ -206,7 +207,7 @@ class Game:
             for h in [(i + self.sb_id) % len(self._players) for i in range(len(self._players))]:
                 self._players[h].hand.append(self._deck.deal())
 
-        self._history.add_hands([pl.hand for pl in self._players])
+        self.history.add_hands([pl.hand for pl in self._players])
 
         self.current_pl_id = next(self.in_hand_players(start=self.bb_id, skip_start=True))
 
@@ -221,7 +222,7 @@ class Game:
 
         if self.current_pl_data.state.active():
             action, amt = self._players[self.current_pl_id].move(self)
-            self._history.add_action(self.betting_round(), self.current_pl_id, (action, amt))
+            self.history.add_action(self.betting_round(), self.current_pl_id, (action, amt))
             bet = None
 
             if amt is not None and amt < 0:
@@ -291,9 +292,9 @@ class Game:
         if self.betting_round() != BettingRound.RIVER:
             self._deck.burn()
             if self.betting_round() == BettingRound.PREFLOP:
-                self.community.extend(self._history.deal(self._deck.deal(3)))
+                self.community.extend(self.history.deal(self._deck.deal(3)))
             else:
-                self.community.append(self._history.deal(self._deck.deal()))
+                self.community.append(self.history.deal(self._deck.deal()))
 
     def end_hand(self):
         '''Called at the end of a hand (showdown or one player remaining)'''
@@ -302,7 +303,7 @@ class Game:
         def hand(t: Tuple[int, Hand]):
             return t[1]
 
-        self._history.end_hand()
+        self.history.end_hand()
 
         # hand was ended before river, make the one person left win
         if len(self.community) < 5:
@@ -319,7 +320,7 @@ class Game:
             winners = [pl_id(pl) for pl in pot_hands if hand(pl) == hand(pot_hands[-1])]
             win_value = pot.total() // len(winners)
             remainder = pot.total() % len(winners)
-            self._history.add_result(pot_n, pot.total(), winners, rankings[-1][1])
+            self.history.add_result(pot_n, pot.total(), winners, rankings[-1][1])
 
             # give remainder to first player past button
             if remainder != 0:
@@ -440,7 +441,7 @@ class Game:
     def __get_hand_rankings(self) -> List[Tuple[int, Hand]]:
         '''Returns tuple of (pl_id, highest_hand) sorted by strength of hand of all players'''
         return sorted([
-            (i, Hand.get_best_hand(*self.community, *self._players[i].hand))
+            (i, eval_hand([*self.community, *self._players[i].hand]))
             for i in range(len(self._players))
             if self.pl_data[i].state != PlayerState.FOLDED
         ], key=lambda x: x[1], reverse=True)
