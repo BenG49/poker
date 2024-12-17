@@ -292,7 +292,7 @@ class Game:
         self.current_pl_id = next(self.in_hand_players(start=self.bb_id, skip_start=True))
 
         # check if only one player remaining or showdown
-        if it_len(self.active_players()) == 1 or \
+        if it_len(self.active_players()) < 2 or \
            self.betting_round() == BettingRound.RIVER:
             self.end_hand()
 
@@ -314,14 +314,26 @@ class Game:
         self.history.end_hand()
 
         # hand was ended before river, make the one person left win
-        if len(self.community) < 5:
+        if it_len(self.pl_iter(exclude_states=(PlayerState.FOLDED,))) == 1:
             rankings = [
                 (self._players[pl].id, -1 if self.pl_data[pl].state.active() else 0)
                 for pl in self.pl_iter(exclude_states=(PlayerState.OUT,))
             ]
             rankings.sort(key=hand, reverse=True)
         else:
-            rankings = self.__get_hand_rankings()
+            # if hand was ended before river, deal rest of community
+            while len(self.community) < 5:
+                self._deck.burn()
+                if self.betting_round() == BettingRound.PREFLOP:
+                    self.community.extend(self.history.deal(self._deck.deal(3)))
+                else:
+                    self.community.append(self.history.deal(self._deck.deal()))
+
+            rankings = sorted([
+                (i, eval_hand([*self.community, *self._players[i].hand]))
+                for i in range(len(self._players))
+                if self.pl_data[i].state != PlayerState.FOLDED
+            ], key=lambda x: x[1], reverse=True)
 
         for pot_n, pot in enumerate(self.pots):
             pot_hands = list(filter(lambda x: pl_id(x) in pot.players(), rankings))
@@ -431,7 +443,7 @@ class Game:
         '''Wrap pldata_iter for active players (only those who have yet to call or have called)'''
         return self.pldata_iter(
             start, reverse,
-            include_states=(PlayerState.TO_CALL, PlayerState.MOVED),
+            exclude_states=(PlayerState.OUT, PlayerState.FOLDED),
             skip_start=skip_start
         )
 
@@ -448,14 +460,6 @@ class Game:
         self._players.append(player)
 
     ### NON-MODIFIER UTILS ###
-
-    def __get_hand_rankings(self) -> List[Tuple[int, Hand]]:
-        '''Returns tuple of (pl_id, highest_hand) sorted by strength of hand of all players'''
-        return sorted([
-            (i, eval_hand([*self.community, *self._players[i].hand]))
-            for i in range(len(self._players))
-            if self.pl_data[i].state != PlayerState.FOLDED
-        ], key=lambda x: x[1], reverse=True)
 
     def betting_round(self) -> BettingRound:
         '''What the current betting round is'''
