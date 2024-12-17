@@ -174,6 +174,10 @@ class Game:
             return
         self.state = GameState.RUNNING
 
+        # add all players to pot in case game instantly ends
+        for pl in self.in_hand_players():
+            self.__bet(pl, 0)
+
         # blinds
         if len(self._players) == 2:
             self.sb_id = self.button_id
@@ -183,23 +187,25 @@ class Game:
 
         # small blind
         sb_amt = min(self.small_blind, self.pl_data[self.sb_id].chips)
-        self.__bet(self.sb_id, sb_amt)
-        self.history.add_action(
-            BettingRound.PREFLOP,
-            self.sb_id,
-            (Action.ALL_IN, None) if sb_amt == self.pl_data[self.sb_id].chips
-                else (Action.RAISE, sb_amt)
-        )
+        if sb_amt > 0:
+            self.__bet(self.sb_id, sb_amt)
+            self.history.add_action(
+                BettingRound.PREFLOP,
+                self.sb_id,
+                (Action.ALL_IN, None) if sb_amt == self.pl_data[self.sb_id].chips
+                    else (Action.RAISE, sb_amt)
+            )
 
         # big blind
         bb_amt = min(self.big_blind, self.pl_data[self.bb_id].chips)
-        self.__bet(self.bb_id, bb_amt)
-        self.history.add_action(
-            BettingRound.PREFLOP,
-            self.bb_id,
-            (Action.ALL_IN, None) if bb_amt == self.pl_data[self.bb_id].chips
-                else (Action.RAISE, bb_amt - sb_amt)
-        )
+        if bb_amt > 0:
+            self.__bet(self.bb_id, bb_amt)
+            self.history.add_action(
+                BettingRound.PREFLOP,
+                self.bb_id,
+                (Action.ALL_IN, None) if bb_amt == self.pl_data[self.bb_id].chips
+                    else (Action.RAISE, bb_amt - sb_amt)
+            )
 
         # deal hands
         self.community = []
@@ -220,7 +226,7 @@ class Game:
 
     def accept_move(self, action: Action, amt: int=None):
         '''Accept move, handle resulting game state'''
-        if self.state != GameState.RUNNING:
+        if not self.running():
             return
 
         if self.current_pl_data.state.active():
@@ -346,7 +352,7 @@ class Game:
     def step_hand(self):
         '''Run one hand'''
         self.init_hand()
-        while self.state == GameState.RUNNING:
+        while self.running():
             self.step_move()
 
     ### GETTERS ###
@@ -363,6 +369,9 @@ class Game:
         if self.pl_data[pl_id].state.active():
             return self.pots[self.pl_data[pl_id].latest_pot].chips_to_call(pl_id)
         return 0
+
+    def running(self) -> bool:
+        return self.state == GameState.RUNNING
 
     ### ITERATORS ###
 

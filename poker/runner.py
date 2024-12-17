@@ -14,13 +14,13 @@ class BotTUI:
     def run_hand(self):
         self.game.init_hand()
 
-        if self.game.state == GameState.RUNNING:
+        if self.game.running():
             self.toggle_print()
             self.toggle_print('Chips:', self.dict_str(map(lambda x: x.chips, self.game.pl_data)))
             self.toggle_print('New Hands:', self.hand_str())
             self.toggle_print('PREFLOP')
 
-        while self.game.state == GameState.RUNNING:
+        while self.game.running():
             action, amt = self.game._players[self.game.current_pl_id].move(self.game)
             start_round = self.game.betting_round()
 

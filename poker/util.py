@@ -41,6 +41,16 @@ class Action(Enum):
         if self == Action.FOLD:
             return 'folded'
 
+    def to_short_str(self, amt: Optional[int]) -> str:
+        if self == Action.RAISE:
+            return 'r' + str(amt)
+
+        return {
+            Action.ALL_IN: 'a',
+            Action.CALL: 'c',
+            Action.FOLD: 'f'
+        }[self]
+
 class BettingRound(Enum):
     PREFLOP = 0
     FLOP = 1
