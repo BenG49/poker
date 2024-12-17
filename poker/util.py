@@ -137,6 +137,14 @@ class Card:
     def __int__(self) -> int:
         return self.value
 
+    def __eq__(self, other) -> bool:
+        if isinstance(other, Card):
+            return self.rank == other.rank and self.suit == other.suit
+        return self.value & 0x3F == other & 0x3F
+
+    def __hash__(self) -> int:
+        return hash(self.value)
+
     def __repr__(self) -> str:
         return self.__str__()
     def __str__(self) -> str:

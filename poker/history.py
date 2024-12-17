@@ -10,7 +10,8 @@ class GameHistory:
     '''Datastructure to store poker game history, works with Game from poker.game'''
 
     # round, player id, action, amt
-    ActionTuple = Tuple[BettingRound, int, Action, Optional[int]]
+    # None is end of round specifier
+    ActionTuple = Optional[Tuple[BettingRound, int, Action, Optional[int]]]
     # pot id, pot total, winner list, best hand (-1 if win from fold)
     WinTuple = Tuple[int, int, List[int], Hand]
 
@@ -23,7 +24,7 @@ class GameHistory:
     def results_str(results: WinTuple) -> str:
         '''Converts results tuple to string'''
         winners = ', '.join(map(str, results[2]))
-        result = prettyprint(results[3]) if isinstance(results[3], Hand) else str(results[3])
+        result = prettyprint(results[3])
         return f'Players [{winners}] win (Pot {results[0]}, ${results[1]}) with {result}'
 
     def __init__(self):
@@ -58,6 +59,7 @@ class GameHistory:
     def end_hand(self):
         '''Call before calling add_result, after the end of the hand, before processing pots'''
         self.results.append([])
+        self.actions.append(None)
 
     def add_result(self, pot: int, pot_amt: int, winners: List[int], top_hand: Hand):
         '''Add result for each pot processed'''
@@ -72,17 +74,14 @@ class GameHistory:
         for hand, result in zip(self._hands, self.results):
             out += 'Hands: ' + str(list(zip(hand[::2], hand[1::2]))) + '\n'
 
-            round_start = True
             while True:
                 if move_idx >= len(self.actions):
                     break
+                if self.actions[move_idx] is None:
+                    move_idx += 1
+                    break
                 # new betting round
                 if last_round != self.actions[move_idx][0]:
-                    if last_round.value > self.actions[move_idx][0].value:
-                        if not round_start:
-                            break
-                        round_start = False
-
                     last_round = self.actions[move_idx][0]
                     out += '\n' + last_round.name + '\n'
 

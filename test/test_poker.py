@@ -39,7 +39,7 @@ class TestHand(unittest.TestCase):
             eval_hand([Card.new('Th'), Card.new('Jh'), Card.new('Qh'), Card.new('Kh'), Card.new('Ah')])
         ]
 
-        assert hands == [
+        self.assertEqual(hands, [
             6926,
             3752,
             2662,
@@ -50,7 +50,7 @@ class TestHand(unittest.TestCase):
             108,
             9,
             1
-        ]
+        ])
 
     def test_highest_hand(self):
         self.assertEqual(eval_hand([Card.new('Th'), Card.new('Jh'), Card.new('Qh'), Card.new('Kh'), Card.new('Ah')]),
