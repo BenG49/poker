@@ -26,7 +26,7 @@ class GameHistory:
     def results_str(results: WinTuple) -> str:
         '''Converts results tuple to string'''
         winners = ', '.join(map(str, results[2]))
-        result = prettyprint(results[3])
+        result = prettyprint(results[3]) if results[3] > 0 else 'others folding'
         return f'Players [{winners}] win (Pot {results[0]}, ${results[1]}) with {result}'
 
     def __init__(self):
