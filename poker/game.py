@@ -137,7 +137,7 @@ class Game:
         self.big_blind: int = bigblind
         self.small_blind: int = bigblind // 2
 
-        self.state: GameState = GameState.OVER
+        self.state: GameState = GameState.HAND_DONE
 
         # game state
         self.button_id: int = 0
