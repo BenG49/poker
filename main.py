@@ -10,7 +10,7 @@ def main():
     game.add_player(bots.EquityBot())
     game.step_hand()
     game.step_hand()
-    print(game._history)
+    print(game.history)
 
 if __name__ == '__main__':
     main()
