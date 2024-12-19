@@ -74,11 +74,11 @@ class History:
 
     Different from GameHistory because this history includes dealing as a chance action.
     '''
-    def __init__(self, players: int, game_settings: tuple):
+    def __init__(self, players: int, game_settings: dict):
         self.bet_history: str = ''
 
         self.last_card_dealt_count = 0
-        self.game = Game(*game_settings)
+        self.game = Game(**game_settings)
         # add players
         for _ in range(players):
             self.game.add_player(EmptyPlayer())
@@ -129,6 +129,7 @@ class History:
         '''Return infoset for current history state'''
         return InfoSet(
             self.current_pl_info_set_key(),
+            self.game.current_pl_id,
             self.game.get_moves(self.game.current_pl_id)
         )
 
@@ -172,6 +173,7 @@ class InfoSet:
                     }[s[0]]
                 return Action.RAISE, int(s[1:])
 
+            player = int(next(f).strip()[1:])
             out = {}
             for line in f:
                 key, strat = line.strip().split('=')
@@ -183,8 +185,9 @@ class InfoSet:
                 out[key] = infoset
             return out
 
-    def __init__(self, key: str, _actions: List[Move]):
+    def __init__(self, key: str, player: int, _actions: List[Move]):
         self.key = key
+        self.player = player
         self._actions = _actions
         self.regrets = {a: 0. for a in self.actions()}
         self.strategy_sum = {a: 0. for a in self.actions()}
@@ -236,9 +239,10 @@ class InfoSet:
         return self.__str__()
 
 class CFR:
-    def __init__(self, players: int):
+    def __init__(self, players: int, game_settings: dict):
         self.players = players
         self.info_sets: Dict[str, InfoSet] = {}
+        self.game_settings = game_settings
 
     def _get_info_set(self, h: History) -> InfoSet:
         '''Get info set for next player to move from given history'''
@@ -282,9 +286,6 @@ class CFR:
             # weight payoff of each action by probability of taking this action
             payoff += payoffs[action] * info_set.strategy[action]
 
-        # payoff calculated for this history
-        h.payoff = payoff
-
         ### UPDATE PLAYER ###
         if h.current_player() == player:
             for action in info_set.actions():
@@ -299,14 +300,16 @@ class CFR:
 
         return payoff
 
-    def save_infosets(self, file: str):
+    def save_infosets(self, file: str, player: int):
         '''Save infosets to file f'''
         with open(file, 'w', encoding='utf-8') as f:
+            f.write(f'P{player}\n')
             for k, infoset in self.info_sets.items():
-                f.write(k)
-                f.write('=')
-                f.write(str(infoset))
-                f.write('\n')
+                if infoset.player == player:
+                    f.write(k)
+                    f.write('=')
+                    f.write(str(infoset))
+                    f.write('\n')
 
 
     # TODO: test subset:
@@ -314,7 +317,7 @@ class CFR:
     #       - limit possible bets
     def run(self, iterations: int):
         for t in range(iterations):
-            # for p in range(self.players*0+1):
-            self.step_tree(History(self.players, (2, 0)), 0, 1, 1)
+            for p in range(self.players):
+                self.step_tree(History(self.players, self.game_settings), p, 1, 1)
 
             print('Completed iteration', t)
