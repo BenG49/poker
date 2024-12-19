@@ -185,17 +185,13 @@ class Deck:
     def __init__(self):
         self.deck = copy(Deck.DECK)
 
-    def deal(self, n: int=1) -> Card | List[Card]:
+    def deal(self, n: int=1) -> List[Card]:
         '''Deal n cards, put those cards at the back of the deck'''
         assert n >= 1
 
         out = self.deck[-n:]
         self.deck = out + self.deck[:-n]
-        return out[0] if n == 1 else out
-
-    def burn(self, n: int=1):
-        '''Wrapper, deal cards nowhere, put them at the back'''
-        self.deal(n)
+        return out
 
     def shuffle(self):
         '''Shuffle internal card list'''

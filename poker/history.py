@@ -48,12 +48,9 @@ class GameHistory:
             action
         ))
 
-    def deal(self, cards) -> Card | List[Card]:
+    def deal(self, cards: List[Card]) -> List[Card]:
         '''Add dealt card to history'''
-        if isinstance(cards, Card):
-            self.cards.append(cards)
-        else:
-            self.cards.extend(cards)
+        self.cards += cards
         return cards
 
     def add_hands(self, round_hands: List[List[Card]]):

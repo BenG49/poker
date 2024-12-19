@@ -29,6 +29,7 @@
 - ~~convert LUT keys to be product of unique primes, thoroughly time before and after~~
 - store Player class in PlayerData, store _hand in PlayerData and Player, name pldata array players
 - ~~add @property stuff in Player for chips, chips to call, etc~~
+- ~~get rid of burning cards, make deal simpler, re-find rng seeds for correct cases~~
 
 - ~~REMOVE BLINDS FROM HISTORY~~
 - run tournament style with diff bots

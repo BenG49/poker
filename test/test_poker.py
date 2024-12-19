@@ -107,7 +107,7 @@ class TestGame(unittest.TestCase):
         game.pl_data[-1].chips = 100
         game.add_player(bots.AllIn())
         game.pl_data[-1].chips = 50
-        random.seed(27)
+        random.seed(9)
         game.step_hand()
 
         # player 3 and player 0 tie
@@ -133,7 +133,7 @@ class TestGame(unittest.TestCase):
         game.add_player(bots.AllIn())
         game.pl_data[-1].chips = 20
         game.add_player(bots.AllIn())
-        random.seed(107)
+        random.seed(12)
         game.step_hand()
 
         self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [10, 20, 100])
@@ -157,7 +157,7 @@ class TestGame(unittest.TestCase):
         game.add_player(bots.AllIn())
         game.pl_data[-1].chips = 10
         game.add_player(bots.AllIn())
-        random.seed(107)
+        random.seed(12)
         game.step_hand()
 
         self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [20, 10, 100])

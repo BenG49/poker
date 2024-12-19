@@ -216,9 +216,8 @@ class Game:
         for pl in self._players:
             pl.hand = []
         self._deck.shuffle()
-        for _ in range(2):
-            for h in [(i + self.sb_id) % len(self._players) for i in range(len(self._players))]:
-                self._players[h].hand.append(self._deck.deal())
+        for p in self._players:
+            p.hand = tuple(self._deck.deal(2))
 
         self.history.add_hands([pl.hand for pl in self._players])
 
@@ -307,11 +306,8 @@ class Game:
 
         # deal next round
         elif self.betting_round() != BettingRound.RIVER:
-            self._deck.burn()
-            if self.betting_round() == BettingRound.PREFLOP:
-                self.community.extend(self.history.deal(self._deck.deal(3)))
-            else:
-                self.community.append(self.history.deal(self._deck.deal()))
+            ncards = 3 if self.betting_round() == BettingRound.PREFLOP else 1
+            self.community += self.history.deal(self._deck.deal(ncards))
 
     def end_hand(self):
         '''Called at the end of a hand (showdown or one player remaining)'''
@@ -332,11 +328,8 @@ class Game:
         else:
             # if hand was ended before river, deal rest of community
             while len(self.community) < 5:
-                self._deck.burn()
-                if self.betting_round() == BettingRound.PREFLOP:
-                    self.community.extend(self.history.deal(self._deck.deal(3)))
-                else:
-                    self.community.append(self.history.deal(self._deck.deal()))
+                ncards = 3 if self.betting_round() == BettingRound.PREFLOP else 1
+                self.community += self.history.deal(self._deck.deal(ncards))
 
             rankings = sorted([
                 (i, hands.evaluate([*self.community, *self._players[i].hand]))
