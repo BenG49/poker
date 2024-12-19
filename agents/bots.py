@@ -1,6 +1,7 @@
 '''
 Stores all poker bots
 '''
+import random
 from typing import List
 from poker.game import Action, BettingRound, Game, Move, Player
 from poker.hand import HandType, eval_hand, hand_type
@@ -27,6 +28,17 @@ class Folder(Player):
 class AllIn(Player):
     def move(self, game: Game) -> Move:
         return Action.ALL_IN, None
+
+class Random(Player):
+    def __init__(self, fold: bool):
+        super().__init__()
+        self.fold = fold
+
+    def move(self, game: Game) -> Move:
+        moves = game.get_moves(self.id)
+        if not self.fold:
+            moves = [(a, v) for a, v in moves if a != Action.FOLD]
+        return random.choice(moves)
 
 class TerminalPlayer(Player):
     def move(self, game: Game) -> Move:

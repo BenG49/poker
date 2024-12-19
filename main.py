@@ -1,18 +1,13 @@
 '''
 main.py
 '''
+from itertools import combinations
 import random
+
 from agents import bots
+from agents.boteval import boteval
 from agents.cfr import CFR, CFRBot, InfoSet
 from poker.game import Game
-
-def main():
-    game = Game(buy_in=1000, bigblind=10)
-    game.add_player(bots.Raiser(game.small_blind))
-    game.add_player(bots.EquityBot())
-    game.step_hand()
-    game.step_hand()
-    print(game.history)
 
 GAME_CONFIG = {
     'buy_in': 2,
@@ -33,6 +28,33 @@ def run_cfr_from_file():
     game.step_hand()
     print(game.history)
     print(game.history.cards)
+
+def main():
+    BUY_IN = 1000
+    BB = 20
+
+    all_bots = [
+        (lambda: bots.Raiser(BB), 'BB Raiser'),
+        (bots.Folder,  'Folder'),
+        (bots.Checker, 'Checker'),
+        (bots.AllIn,   'All In'),
+        (lambda: bots.Random(False), 'Random'),
+    ]
+
+    def g():
+        return Game(BUY_IN, BB)
+
+    for matchup in combinations(all_bots, 2):
+        a, a_name = matchup[0]
+        b, b_name = matchup[1]
+        a_eval = boteval(a, b, g, 1000)
+
+        if a_eval == 0:
+            print(f'{a_name} ties {b_name}')
+        else:
+            winner, loser = (a_name, b_name) if a_eval > 0 else (b_name, a_name)
+
+            print(f'{winner} beats {loser} by {abs(a_eval)} mbb/h')
 
 if __name__ == '__main__':
     main()
