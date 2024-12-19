@@ -141,7 +141,7 @@ class Card:
     @staticmethod
     def prime_prod(cards: List['Card']) -> int:
         '''Return prime product of list of cards'''
-        return prod(map(lambda c: c.rank.prime, cards))
+        return prod(c.rank.prime for c in cards)
 
     def __init__(self, rank: int, suit: int):
         self.value = (suit << 4) | rank

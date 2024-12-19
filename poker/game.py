@@ -107,7 +107,7 @@ class Pot:
     def __repr__(self) -> str:
         return self.__str__()
     def __str__(self) -> str:
-        return f'(${self.chips} {", ".join(map(lambda x: f"PL{x[0]}:${x[1]}", self.bets.items()))})'
+        return f'(${self.chips} {", ".join(f"PL{p}:${b}" for p, b in self.bets.items())})'
 
 @dataclass
 class PlayerData:

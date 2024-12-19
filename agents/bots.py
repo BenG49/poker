@@ -50,7 +50,7 @@ class TerminalPlayer(Player):
     '''Terminal interface for human player'''
     def move(self, game: Game) -> Move:
         print('Your turn.')
-        print('Chips:', ', '.join(list(map(lambda p: f'P{p}:(${game.pl_data[p].chips}, bet ${game.current_pl_pot.bets.get(p, 0)})', game.pl_iter(skip_start=True)))))
+        print('Chips:', ', '.join(f'P{p}:(${game.pl_data[p].chips}, bet ${game.current_pl_pot.bets.get(p, 0)})' for p in game.pl_iter(skip_start=True)))
         print('Community:', game.community)
         print('Your hand:', self.hand)
         print(f'Chips to call: ${game.chips_to_call(self.id)}')
