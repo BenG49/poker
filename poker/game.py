@@ -133,6 +133,9 @@ class Player(ABC):
     def move(self, game) -> Move:
         ...
 
+    def chips(self, game) -> int:
+        return game.pl_data[self.id].chips
+
 class Game:
     '''Game'''
     def __init__(self, buy_in: int, bigblind: int = 2):

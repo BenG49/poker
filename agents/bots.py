@@ -9,28 +9,33 @@ from poker.hands import HandType
 from poker.util import Card, Deck, Rank, same
 
 class Raiser(Player):
+    '''Raises by min_raise every turn'''
     def __init__(self, min_raise: int):
         super().__init__()
         self.min_raise = min_raise
 
     def move(self, game: Game) -> Move:
-        if game.current_pl_data.chips < game.chips_to_call(self.id):
+        if self.chips(game) - game.chips_to_call(self.id) <= self.min_raise:
             return Action.ALL_IN, None
-        return Action.RAISE, min(self.min_raise, game.current_pl_data.chips - game.chips_to_call(self.id))
+        return Action.RAISE, self.min_raise
 
 class Checker(Player):
+    '''Checks/calls every turn'''
     def move(self, game: Game) -> Move:
         return Action.CALL, None
 
 class Folder(Player):
+    '''Folds every hand'''
     def move(self, game: Game) -> Move:
         return Action.FOLD, None
 
 class AllIn(Player):
+    '''Goes all in every hand'''
     def move(self, game: Game) -> Move:
         return Action.ALL_IN, None
 
 class Random(Player):
+    '''Randomly chooses from all moves, excluding folds if fold=False'''
     def __init__(self, fold: bool):
         super().__init__()
         self.fold = fold
@@ -42,6 +47,7 @@ class Random(Player):
         return random.choice(moves)
 
 class TerminalPlayer(Player):
+    '''Terminal interface for human player'''
     def move(self, game: Game) -> Move:
         print('Your turn.')
         print('Chips:', ', '.join(list(map(lambda p: f'P{p}:(${game.pl_data[p].chips}, bet ${game.current_pl_pot.bets.get(p, 0)})', game.pl_iter(skip_start=True)))))
