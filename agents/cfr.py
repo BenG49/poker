@@ -153,7 +153,7 @@ class History:
         return deepcopy(self).append(action)
 
     def __str__(self) -> str:
-        return f'{self.payoff: 01.3f} {self.game.history._hands[0]}:{self.game.history.cards}:{self.bet_history}'
+        return f'{self.game.history._hands[0]}:{self.game.history.cards}:{self.bet_history}'
     def __repr__(self) -> str:
         return self.__str__()
 
@@ -179,7 +179,7 @@ class InfoSet:
                 key, strat = line.strip().split('=')
                 strat = {decode_action(k): v for k, v in loads(strat).items()}
 
-                infoset = InfoSet(key, list(strat.keys()))
+                infoset = InfoSet(key, player, list(strat.keys()))
                 infoset.strategy = strat
 
                 out[key] = infoset
