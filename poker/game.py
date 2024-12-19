@@ -258,19 +258,17 @@ class Game:
             if bet:
                 if bet > self.chips_to_call(self.current_pl_id):
                     # make everyone else call this raise
-                    it = self.active_players()
-                    if count(self.active_players()) > 1:
-                        next(it)
-                        for pl in it:
+                    for i, pl in enumerate(self.pl_data):
+                        if i == self.current_pl_id:
+                            continue
+                        if pl.state == PlayerState.MOVED:
                             pl.state = PlayerState.TO_CALL
                 self.__bet(self.current_pl_id, bet)
 
         self.current_pl_id = next(self.in_hand_players(skip_start=True))
 
-        # have all players moved for this round?
-        # is there only one person left who can win?
-        if count(self.pl_iter(include_states=(PlayerState.TO_CALL,))) == 0 or \
-           count(self.pl_iter(exclude_states=(PlayerState.FOLDED,))) == 1:
+        if (PlayerState.TO_CALL not in map(lambda p: p.state, self.pl_data)) or \
+           self.not_folded_count() == 1:
             self.end_round()
 
     def end_round(self):
@@ -278,22 +276,24 @@ class Game:
         # clear remaining bets into most up to date pot
         split = self.pots[-1].split()
         self.pots[-1].collect_bets()
-        if split is not None:
+        while split is not None:
             # move all players in last pot to new pot
             for pl in self.pots[-1].players():
                 self.pl_data[pl].latest_pot += 1
             self.pots.append(split)
 
+            split = self.pots[-1].split()
+            self.pots[-1].collect_bets()
+
         # give everyone one turn
-        # don't reset completely b/c players with zero chips could be all in
-        for pl in self.active_players():
-            pl.state = PlayerState.TO_CALL
+        for pl in self.pl_data:
+            if pl.state == PlayerState.MOVED:
+                pl.state = PlayerState.TO_CALL
 
         self.current_pl_id = next(self.in_hand_players(start=self.bb_id, skip_start=True))
 
         # check if only one player remaining or showdown
-        if count(self.active_players()) < 2 or \
-           self.betting_round() == BettingRound.RIVER:
+        if count(self.active_players()) < 2 or self.betting_round() == BettingRound.RIVER:
             self.end_hand()
 
         # deal next round
@@ -314,10 +314,10 @@ class Game:
         self.history.end_hand()
 
         # hand was ended before river, make the one person left win
-        if count(self.pl_iter(exclude_states=(PlayerState.FOLDED,))) == 1:
+        if self.not_folded_count() < 2:
             rankings = [
                 (self._players[pl].id, -1 if self.pl_data[pl].state.active() else 0)
-                for pl in self.pl_iter(exclude_states=(PlayerState.OUT,))
+                for pl in range(len(self._players))
             ]
             rankings.sort(key=hand, reverse=True)
         else:
@@ -331,8 +331,7 @@ class Game:
 
             rankings = sorted([
                 (i, eval_hand([*self.community, *self._players[i].hand]))
-                for i in range(len(self._players))
-                if self.pl_data[i].state != PlayerState.FOLDED
+                for i in self.pl_iter(exclude_states=(PlayerState.FOLDED,))
             ], key=lambda x: x[1], reverse=True)
 
         for pot_n, pot in enumerate(self.pots):
@@ -439,13 +438,31 @@ class Game:
             self.pl_iter(start, reverse, include_states, exclude_states, skip_start)
         )
 
-    def active_players(self, start=None, reverse=False, skip_start=False) -> Iterator[PlayerData]:
-        '''Wrap pldata_iter for active players (only those who have yet to call or have called)'''
+    def not_folded_players(self, start=None, reverse=False, skip_start=False) -> Iterator[PlayerData]:
+        '''Wrap pldata_iter for players that have not folded'''
         return self.pldata_iter(
             start, reverse,
             exclude_states=(PlayerState.OUT, PlayerState.FOLDED),
             skip_start=skip_start
         )
+
+    def active_players(self, start=None, reverse=False, skip_start=False) -> Iterator[PlayerData]:
+        '''Wrap pldata_iter for players that can make moves in the future'''
+        return self.pldata_iter(
+            start, reverse,
+            include_states=(PlayerState.MOVED, PlayerState.TO_CALL),
+            skip_start=skip_start
+        )
+
+    ### PLAYER COUNTS ###
+
+    def not_folded_count(self) -> int:
+        '''Counts # of players in game that haven't folded'''
+        n = 0
+        for pl in self.pl_data:
+            if pl.state not in (PlayerState.FOLDED, PlayerState.OUT):
+                n += 1
+        return n
 
     ### MODIFIERS ###
 
@@ -489,7 +506,6 @@ class Game:
             out.append((Action.CALL, None))
             if free_chips > 0:
                 out.append((Action.ALL_IN, None))
-                for i in range(1, free_chips):
-                    out.append((Action.RAISE, i))
+                out.extend([(Action.RAISE, i) for i in range(1, free_chips)])
 
         return out

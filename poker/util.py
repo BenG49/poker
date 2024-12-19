@@ -1,6 +1,7 @@
 '''
 Utility classes Suit, Rank, Card, Hand
 '''
+from copy import copy
 from enum import Enum, IntEnum
 from random import shuffle
 from typing import List, Iterable, Optional
@@ -162,9 +163,11 @@ class Card:
 
 class Deck:
     '''52-card list with helper methods for dealing'''
+
+    DECK = [Card(r, s) for s in iter(Suit) for r in [Rank.ACE] + list(range(Rank.TWO, Rank.ACE))]
+
     def __init__(self):
-        ranks = [Rank.ACE] + list(range(Rank.TWO, Rank.ACE))
-        self.deck = [Card(Rank(r), Suit(s)) for s in iter(Suit) for r in ranks]
+        self.deck = copy(Deck.DECK)
 
     def deal(self, n: int=1) -> Card | List[Card]:
         '''Deal n cards, put those cards at the back of the deck'''
