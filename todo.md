@@ -1,5 +1,5 @@
 # TODO
-- clean up util.Hand.\_\_init\_\_
+- ~~clean up util.Hand.\_\_init\_\_~~
 - ~~use more iterator methods~~
 - ~~separate deck into class~~
 - ~~improve pot processing~~
@@ -26,12 +26,11 @@
 	- how should bots be tested?
 		- dataset of hand histories?
 
-## Bot
-- Monte Carlo Counterfactual Regret Minimization
-	- figure out what needs to be added to api to extend history, infoset
-		- list all moves (all actions)
-	```python
-	class CFR:
-		def walk_tree():
-			...
-	```
+- ~~convert LUT keys to be product of unique primes, thoroughly time before and after~~
+- store Player class in PlayerData, store _hand in PlayerData and Player, name pldata array players
+- add @property stuff in Player for chips, chips to call, etc
+
+- REMOVE BLINDS FROM HISTORY
+- run tournament style with diff bots
+	- look up types of computer based bots
+		- history recording, heuristic

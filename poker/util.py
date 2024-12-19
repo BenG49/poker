@@ -3,6 +3,7 @@ Utility classes Suit, Rank, Card, Hand
 '''
 from copy import copy
 from enum import Enum, IntEnum
+from math import prod
 from random import shuffle
 from typing import List, Iterable, Optional
 
@@ -95,6 +96,11 @@ class Rank(IntEnum):
         '''Create Rank from string'''
         return Rank('23456789TJQKA'.index(s))
 
+    def __init__(self, *args):
+        super().__init__(args)
+        # prime number associated with each rank
+        self.prime = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41][self.value]
+
     def to_str(self) -> str:
         ''' Convert Rank to string'''
         return '23456789TJQKA'[self.value]
@@ -132,10 +138,20 @@ class Card:
         assert (i >> 4)  < len(Suit)
         return Card(i & 0xF, i >> 4)
 
+    @staticmethod
+    def prime_prod(cards: List['Card']) -> int:
+        '''Return prime product of list of cards'''
+        return prod(map(lambda c: c.rank.prime, cards))
+
     def __init__(self, rank: int, suit: int):
         self.value = (suit << 4) | rank
         self.rank = rank
         self.suit = suit
+
+        if not isinstance(self.rank, Rank):
+            self.rank = Rank(self.rank)
+        if not isinstance(self.suit, Suit):
+            self.suit = Suit(self.suit)
 
     def get_rank(self) -> Rank:
         '''Rank getter'''

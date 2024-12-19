@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Iterator, List, Dict, Tuple, Optional, Self
 
-from .hand import Hand, eval_hand
+from poker import hands
+from .hands import Hand
 from .history import GameHistory
 from .util import Action, BettingRound, Card, Deck, count, same
 
@@ -330,7 +331,7 @@ class Game:
                     self.community.append(self.history.deal(self._deck.deal()))
 
             rankings = sorted([
-                (i, eval_hand([*self.community, *self._players[i].hand]))
+                (i, hands.evaluate([*self.community, *self._players[i].hand]))
                 for i in self.pl_iter(exclude_states=(PlayerState.FOLDED,))
             ], key=lambda x: x[1], reverse=True)
 

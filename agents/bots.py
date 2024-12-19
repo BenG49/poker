@@ -3,8 +3,9 @@ Stores all poker bots
 '''
 import random
 from typing import List
+from poker import hands
 from poker.game import Action, BettingRound, Game, Move, Player
-from poker.hand import HandType, eval_hand, hand_type
+from poker.hands import HandType
 from poker.util import Card, Deck, Rank, same
 
 class Raiser(Player):
@@ -80,18 +81,18 @@ class EquityBot(Player):
 
         # brute force outs
         combined = hand + community
-        current_best = eval_hand(combined)
+        current_best = hands.evaluate(combined)
         outs = set()
 
         for card in iter(Deck()):
             if card in combined:
                 continue
 
-            new_best = eval_hand([*combined, card])
+            new_best = hands.evaluate([*combined, card])
 
             # set minimum hand to 'win' at three of a kind
-            if hand_type(new_best) > hand_type(current_best) and \
-               hand_type(new_best) >= HandType.TPAIR:
+            if hands.get_type(new_best) > hands.get_type(current_best) and \
+               hands.get_type(new_best) >= HandType.TPAIR:
                 outs.add(card)
 
         return 2 * len(outs) / 100.0

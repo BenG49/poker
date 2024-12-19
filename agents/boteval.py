@@ -13,12 +13,12 @@ def boteval(
         a_supplier: Callable[[], Player],
         b_supplier: Callable[[], Player],
         game_supplier: Callable[[], Game],
-        hands: int
+        rounds: int
     ) -> float:
     '''Evalulates two bots, returns mbb/g for player a (-mbb/g for player b)'''
 
     payoff = 0
-    for _ in range(hands // 2):
+    for _ in range(rounds // 2):
         game = game_supplier()
         game.add_player(a_supplier())
         game.add_player(b_supplier())
@@ -37,4 +37,4 @@ def boteval(
             game.step_move()
         payoff += game.pl_data[1].chips - game.buy_in
 
-    return payoff / hands / (game.big_blind / 1000.)
+    return payoff / rounds / (game.big_blind / 1000.)
