@@ -7,7 +7,7 @@ from random import choices
 import random
 from typing import Dict, List
 from poker.game import Game, GameState, Move, Player, PlayerState
-from poker.util import Action, BettingRound, it_len
+from poker.util import Action, BettingRound, count
 
 
 ActionHistT = Move | int
