@@ -14,7 +14,7 @@ def same(it: Iterable) -> bool:
         last = i
     return True
 
-def it_len(it: Iterable) -> int:
+def count(it: Iterable) -> int:
     '''Loops through it to find length'''
     return sum(1 for _ in it)
 

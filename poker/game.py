@@ -8,7 +8,7 @@ from typing import Iterator, List, Dict, Tuple, Optional, Self
 
 from .hand import Hand, eval_hand
 from .history import GameHistory
-from .util import Action, BettingRound, Card, Deck, it_len, same
+from .util import Action, BettingRound, Card, Deck, count, same
 
 Move = Tuple[Action, Optional[int]]
 
@@ -169,7 +169,7 @@ class Game:
         for pl in self.pl_data:
             pl.reset_state()
 
-        if it_len(self.in_hand_players()) < 2:
+        if count(self.in_hand_players()) < 2:
             self.state = GameState.OVER
             return
         self.state = GameState.RUNNING
@@ -259,7 +259,7 @@ class Game:
                 if bet > self.chips_to_call(self.current_pl_id):
                     # make everyone else call this raise
                     it = self.active_players()
-                    if it_len(self.active_players()) > 1:
+                    if count(self.active_players()) > 1:
                         next(it)
                         for pl in it:
                             pl.state = PlayerState.TO_CALL
@@ -269,8 +269,8 @@ class Game:
 
         # have all players moved for this round?
         # is there only one person left who can win?
-        if it_len(self.pl_iter(include_states=(PlayerState.TO_CALL,))) == 0 or \
-           it_len(self.pl_iter(exclude_states=(PlayerState.FOLDED,))) == 1:
+        if count(self.pl_iter(include_states=(PlayerState.TO_CALL,))) == 0 or \
+           count(self.pl_iter(exclude_states=(PlayerState.FOLDED,))) == 1:
             self.end_round()
 
     def end_round(self):
@@ -292,7 +292,7 @@ class Game:
         self.current_pl_id = next(self.in_hand_players(start=self.bb_id, skip_start=True))
 
         # check if only one player remaining or showdown
-        if it_len(self.active_players()) < 2 or \
+        if count(self.active_players()) < 2 or \
            self.betting_round() == BettingRound.RIVER:
             self.end_hand()
 
@@ -314,7 +314,7 @@ class Game:
         self.history.end_hand()
 
         # hand was ended before river, make the one person left win
-        if it_len(self.pl_iter(exclude_states=(PlayerState.FOLDED,))) == 1:
+        if count(self.pl_iter(exclude_states=(PlayerState.FOLDED,))) == 1:
             rankings = [
                 (self._players[pl].id, -1 if self.pl_data[pl].state.active() else 0)
                 for pl in self.pl_iter(exclude_states=(PlayerState.OUT,))
@@ -479,7 +479,7 @@ class Game:
 
     def get_moves(self, pl_id: int) -> List[Move]:
         '''Return all possible moves for player pl_id.'''
-        if not self.pl_data[pl_id].state.active():
+        if not self.pl_data[pl_id].state.active() or not self.running():
             return []
 
         out = [(Action.FOLD, None)]

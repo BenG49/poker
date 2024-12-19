@@ -86,7 +86,7 @@ class History:
     def is_done(self) -> bool:
         '''Ends game after one round'''
         return self.game.state != GameState.RUNNING and len(self.game.history.results) > 0 or \
-            it_len(self.game.pl_iter(exclude_states=(PlayerState.FOLDED,))) < 2
+            count(self.game.pl_iter(exclude_states=(PlayerState.FOLDED,))) < 2
         # or all but one all in and none to call
 
     def payoff(self, player: int) -> int:

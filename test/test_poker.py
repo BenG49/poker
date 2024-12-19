@@ -7,7 +7,7 @@ import random
 from agents import bots
 from poker import hand
 from poker.hand import eval_hand
-from poker.util import Card, it_len, same
+from poker.util import Card, count, same
 from poker.game import Game
 
 class TestUtils(unittest.TestCase):
@@ -16,7 +16,7 @@ class TestUtils(unittest.TestCase):
         self.assertFalse(same([1, 1, 0]))
 
     def test_itlen(self):
-        self.assertEqual(it_len(map(lambda x: x**2, [0, 1, 2])), 3)
+        self.assertEqual(count(map(lambda x: x**2, [0, 1, 2])), 3)
 
 class TestLUT(unittest.TestCase):
     def test_coverage(self):
