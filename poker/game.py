@@ -186,8 +186,8 @@ class Game:
         if len(self._players) == 2:
             self.sb_id = self.button_id
         else:
-            self.sb_id = next(self.in_hand_players(start=self.button_id, skip_start=True))
-        self.bb_id = next(self.in_hand_players(start=self.sb_id, skip_start=True))
+            self.sb_id = self.next_player(self.button_id)
+        self.bb_id = self.next_player(self.sb_id)
 
         # small blind
         sb_amt = min(self.small_blind, self.pl_data[self.sb_id].chips)
@@ -222,7 +222,7 @@ class Game:
 
         self.history.add_hands([pl.hand for pl in self._players])
 
-        self.current_pl_id = next(self.in_hand_players(start=self.bb_id, skip_start=True))
+        self.current_pl_id = self.next_player(self.bb_id)
 
     def step_move(self):
         '''Accept move from current player's entry in _players'''
@@ -230,9 +230,6 @@ class Game:
 
     def accept_move(self, action: Action, amt: int=None):
         '''Accept move, handle resulting game state'''
-        if not self.running():
-            return
-
         if self.current_pl_data.state.active():
             self.history.add_action(self.betting_round(), self.current_pl_id, (action, amt))
             bet = None
@@ -259,7 +256,7 @@ class Game:
                 bet = self.current_pl_data.chips
                 self.current_pl_data.state = PlayerState.ALL_IN
 
-            if bet:
+            if bet is not None:
                 if bet > self.chips_to_call(self.current_pl_id):
                     # make everyone else call this raise
                     for i, pl in enumerate(self.pl_data):
@@ -269,7 +266,7 @@ class Game:
                             pl.state = PlayerState.TO_CALL
                 self.__bet(self.current_pl_id, bet)
 
-        self.current_pl_id = next(self.in_hand_players(skip_start=True))
+        self.current_pl_id = self.next_player()
 
         if (PlayerState.TO_CALL not in map(lambda p: p.state, self.pl_data)) or \
            self.not_folded_count() == 1:
@@ -294,14 +291,14 @@ class Game:
             if pl.state == PlayerState.MOVED:
                 pl.state = PlayerState.TO_CALL
 
-        self.current_pl_id = next(self.in_hand_players(start=self.bb_id, skip_start=True))
+        self.current_pl_id = self.next_player(self.bb_id)
 
         # check if only one player remaining or showdown
         if count(self.active_players()) < 2 or self.betting_round() == BettingRound.RIVER:
             self.end_hand()
 
         # deal next round
-        if self.betting_round() != BettingRound.RIVER:
+        elif self.betting_round() != BettingRound.RIVER:
             self._deck.burn()
             if self.betting_round() == BettingRound.PREFLOP:
                 self.community.extend(self.history.deal(self._deck.deal(3)))
@@ -335,18 +332,18 @@ class Game:
 
             rankings = sorted([
                 (i, hands.evaluate([*self.community, *self._players[i].hand]))
-                for i in self.pl_iter(exclude_states=(PlayerState.FOLDED,))
-            ], key=lambda x: x[1], reverse=True)
+                for i in self.not_folded_players()
+            ], key=hand, reverse=True)
 
         for pot_n, pot in enumerate(self.pots):
-            pot_hands = list(filter(lambda x: pl_id(x) in pot.players(), rankings))
-            winners = [pl_id(pl) for pl in pot_hands if hand(pl) == hand(pot_hands[-1])]
+            pot_rankings = [r for r in rankings if pl_id(r) in pot.players()]
+            winners = [pl_id(pl) for pl in pot_rankings if hand(pl) == hand(pot_rankings[-1])]
             win_value = pot.total() // len(winners)
             remainder = pot.total() % len(winners)
-            self.history.add_result(pot_n, pot.total(), winners, rankings[-1][1])
+            self.history.add_result(pot_n, pot.total(), winners, hand(pot_rankings[-1]))
 
             # give remainder to first player past button
-            if remainder != 0:
+            if remainder > 0:
                 for i in self.pl_iter(start=self.button_id, skip_start=True):
                     if i in winners:
                         self.pl_data[i].chips += remainder
@@ -361,7 +358,7 @@ class Game:
             for winner in winners:
                 self.pl_data[winner].chips += win_value
 
-        self.button_id = next(self.in_hand_players(start=self.button_id, reverse=True, skip_start=True))
+        self.button_id = self.next_player(self.button_id, reverse=True)
         self.state = GameState.HAND_DONE
 
     def step_hand(self):
@@ -387,6 +384,49 @@ class Game:
 
     def running(self) -> bool:
         return self.state == GameState.RUNNING
+
+    def betting_round(self) -> BettingRound:
+        '''What the current betting round is'''
+        return {
+            0: BettingRound.PREFLOP,
+            3: BettingRound.FLOP,
+            4: BettingRound.TURN,
+            5: BettingRound.RIVER
+        }[len(self.community)]
+
+    def raise_to(self, pl_id: int, raise_to: int) -> Optional[int]:
+        '''Convert from raising to the overall pot raise TO raising from the current bet.'''
+        current_raise = self.chips_to_call(pl_id)
+        if current_raise > raise_to:
+            return None
+        return raise_to - current_raise
+
+    def get_moves(self, pl_id: int) -> List[Move]:
+        '''Return all possible moves for player pl_id.'''
+        if not self.pl_data[pl_id].state.active() or not self.running():
+            return []
+
+        out = [(Action.FOLD, None)]
+
+        free_chips = self.pl_data[pl_id].chips - self.chips_to_call(pl_id)
+        if free_chips >= 0:
+            out.append((Action.CALL, None))
+            if free_chips > 0:
+                out.append((Action.ALL_IN, None))
+                out.extend([(Action.RAISE, i) for i in range(1, free_chips)])
+
+        return out
+
+    def next_player(self, pl_id: int=None, reverse: bool=False) -> int:
+        '''Next in hand player after pl_id'''
+        if pl_id is None:
+            pl_id = self.current_pl_id
+
+        out = (pl_id + (-1 if reverse else 1)) % len(self._players)
+
+        if self.pl_data[out].state == PlayerState.OUT:
+            return self.next_player(out, reverse)
+        return out
 
     ### ITERATORS ###
 
@@ -428,6 +468,14 @@ class Game:
         ''''Wrapper for pl_iter excluding players not in the current hand'''
         return self.pl_iter(start, reverse, exclude_states=(PlayerState.OUT,), skip_start=skip_start)
 
+    def not_folded_players(self, start=None, reverse=False, skip_start=False) -> Iterator[int]:
+        '''Wrap pl_iter for players that have not folded'''
+        return self.pl_iter(
+            start, reverse,
+            exclude_states=(PlayerState.OUT, PlayerState.FOLDED),
+            skip_start=skip_start
+        )
+
     def pldata_iter(
         self,
         start=None,
@@ -440,14 +488,6 @@ class Game:
         return map(
             lambda i: self.pl_data[i],
             self.pl_iter(start, reverse, include_states, exclude_states, skip_start)
-        )
-
-    def not_folded_players(self, start=None, reverse=False, skip_start=False) -> Iterator[PlayerData]:
-        '''Wrap pldata_iter for players that have not folded'''
-        return self.pldata_iter(
-            start, reverse,
-            exclude_states=(PlayerState.OUT, PlayerState.FOLDED),
-            skip_start=skip_start
         )
 
     def active_players(self, start=None, reverse=False, skip_start=False) -> Iterator[PlayerData]:
@@ -479,37 +519,3 @@ class Game:
             state=PlayerState.TO_CALL)
         )
         self._players.append(player)
-
-    ### NON-MODIFIER UTILS ###
-
-    def betting_round(self) -> BettingRound:
-        '''What the current betting round is'''
-        return {
-            0: BettingRound.PREFLOP,
-            3: BettingRound.FLOP,
-            4: BettingRound.TURN,
-            5: BettingRound.RIVER
-        }[len(self.community)]
-
-    def raise_to(self, pl_id: int, raise_to: int) -> Optional[int]:
-        '''Convert from raising to the overall pot raise TO raising from the current bet.'''
-        current_raise = self.chips_to_call(pl_id)
-        if current_raise > raise_to:
-            return None
-        return raise_to - current_raise
-
-    def get_moves(self, pl_id: int) -> List[Move]:
-        '''Return all possible moves for player pl_id.'''
-        if not self.pl_data[pl_id].state.active() or not self.running():
-            return []
-
-        out = [(Action.FOLD, None)]
-
-        free_chips = self.pl_data[pl_id].chips - self.chips_to_call(pl_id)
-        if free_chips >= 0:
-            out.append((Action.CALL, None))
-            if free_chips > 0:
-                out.append((Action.ALL_IN, None))
-                out.extend([(Action.RAISE, i) for i in range(1, free_chips)])
-
-        return out
