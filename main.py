@@ -34,27 +34,48 @@ def main():
     BB = 20
 
     all_bots = [
-        (lambda: bots.Raiser(BB), 'BB Raiser'),
-        (bots.Folder,  'Folder'),
-        (bots.Checker, 'Checker'),
-        (bots.AllIn,   'All In'),
-        (lambda: bots.Random(False), 'Random'),
+        [lambda: bots.Raiser(BB),    'BB Raiser'],
+        [bots.Folder,                'Folder'],
+        [bots.Checker,               'Checker'],
+        [bots.AllIn,                 'All In'],
+        [lambda: bots.Random(False), 'Random'],
+        [bots.PocketPairSeeker,      'Pocket Pair Seeker'],
     ]
+
+    # wins, ties, losses, net mbb/h
+    results = [[0, 0, 0, 0] for _ in all_bots]
 
     def g():
         return Game(BUY_IN, BB)
 
-    for matchup in combinations(all_bots, 2):
-        a, a_name = matchup[0]
-        b, b_name = matchup[1]
+    for matchup in combinations(enumerate(all_bots), 2):
+        i, (a, _) = matchup[0]
+        j, (b, _) = matchup[1]
         a_eval = boteval(a, b, g, 1000)
 
         if a_eval == 0:
-            print(f'{a_name} ties {b_name}')
+            results[i][1] += 1
+            results[j][1] += 1
         else:
-            winner, loser = (a_name, b_name) if a_eval > 0 else (b_name, a_name)
+            if a_eval > 0:
+                results[i][0] += 1
+                results[j][2] += 1
+            else:
+                results[j][0] += 1
+                results[i][2] += 1
 
-            print(f'{winner} beats {loser} by {abs(a_eval)} mbb/h')
+            results[i][3] += a_eval
+            results[j][3] -= a_eval
+        print('.', end='', flush=True)
+    print('\n')
+
+    max_lengths = max(len(b[1]) for b in all_bots)
+    print('RESULTS:'.center(max_lengths), 'W/L/T', 'Net mbb/h')
+    print('\n'.join([
+        f'{name.ljust(max_lengths)} {w}/{l}/{t} {round(net, 3):+}'
+        for (w, t, l, net), (_, name) in
+        sorted(zip(results, all_bots), key=lambda x: x[0][0], reverse=True)
+    ]))
 
 if __name__ == '__main__':
     main()

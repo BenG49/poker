@@ -116,3 +116,9 @@ class EquityBot(Player):
             return Action.FOLD, None
 
         return Action.CALL, None
+
+class PocketPairSeeker(Player):
+    def move(self, game: Game) -> Move:
+        if same(map(Card.get_rank, self.hand)):
+            return Action.ALL_IN, None
+        return Action.FOLD, None
