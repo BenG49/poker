@@ -156,7 +156,7 @@ class Game:
         self.community: List[Card] = []
         self.pots: List[Pot] = [Pot(0, {})]
 
-        self.history: GameHistory = GameHistory()
+        self.history: GameHistory = GameHistory(self.buy_in, self.big_blind, self.small_blind)
 
         ### PRIVATE ###
         self._players: List[Player] = []
@@ -241,7 +241,6 @@ class Game:
                 elif amt == 0:
                     action = Action.CALL
                     amt = None
-
 
             self.history.add_action(self.betting_round(), self.current_pl_id, (action, amt))
             bet = None

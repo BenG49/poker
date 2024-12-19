@@ -5,7 +5,7 @@ from typing import Callable
 from poker.game import Game, Player
 
 def set_cards_state(game, state):
-    game._players[0].hand, game._players[1].hand = zip(state[0][::2], state[0][1::2])
+    game._players[0].hand, game._players[1].hand = state[0]
     game.history._hands[0] = state[0]
     game._deck.deck = state[1]
 

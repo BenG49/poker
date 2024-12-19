@@ -30,13 +30,14 @@ class GameHistory:
         result = hands.to_str(results[3]) if results[3] > 0 else 'others folding'
         return f'Players [{winners}] win (Pot {results[0]}, ${results[1]}) with {result}'
 
-    def __init__(self):
+    def __init__(self, buy_in, big_blind, small_blind):
+        self.buy_in = buy_in
+        self.big_blind = big_blind
+        self.small_blind = small_blind
+
         self.actions: List[GameHistory.ActionTuple] = []
         self.cards: List[Card] = []
-        # flattened list of hands
-        # ex. 2 players with [Kh, Kc] and [Qh, 4s]
-        # [Kh, Kc, Qh, 4s]
-        self._hands: List[List[Card]] = []
+        self._hands: List[List[Tuple[Card]]] = []
         self.results: List[GameHistory.WinTuple] = []
 
     def add_action(self, bround: BettingRound, player: int, action: Move):
@@ -57,7 +58,7 @@ class GameHistory:
 
     def add_hands(self, round_hands: List[List[Card]]):
         '''Add new round's hands to history'''
-        self._hands.append(tuple(card for hand in round_hands for card in hand))
+        self._hands.append(round_hands)
 
     def end_hand(self):
         '''Call before calling add_result, after the end of the hand, before processing pots'''
@@ -75,17 +76,20 @@ class GameHistory:
         move_idx = 0
         last_round = BettingRound.RIVER
         for hand, result in zip(self._hands, self.results):
-            out += 'Hands: ' + str(list(zip(hand[::2], hand[1::2]))) + '\n'
+            start_move = move_idx
+            out += 'Hands: ' + str(hand) + '\n'
 
             while True:
+                action = self.actions[move_idx]
+
                 if move_idx >= len(self.actions):
                     break
-                if self.actions[move_idx] is None:
+                if action is None:
                     move_idx += 1
                     break
                 # new betting round
-                if last_round != self.actions[move_idx][0]:
-                    last_round = self.actions[move_idx][0]
+                if last_round != action[0]:
+                    last_round = action[0]
                     out += '\n' + last_round.name + '\n'
 
                     if last_round != BettingRound.PREFLOP:
@@ -93,7 +97,15 @@ class GameHistory:
                         out += f'New Cards: {self.cards[card_idx:card_idx + ncards]}\n'
                         card_idx += ncards
 
-                out += GameHistory.action_str(self.actions[move_idx]) + '\n'
+                if move_idx - start_move < 2 and self.big_blind > 0 and self.small_blind > 0:
+                    if move_idx == start_move:
+                        out += f'P{action[1]} posts small blind (${action[2][1]})'
+                    else:
+                        amt = action[2][1] + self.actions[start_move][2][1]
+                        out += f'P{action[1]} posts big blind (${amt})'
+                else:
+                    out += f'P{action[1]} {action[2][0].to_str(action[2][1])}'
+                out += '\n'
                 move_idx += 1
 
             out += '\n'
