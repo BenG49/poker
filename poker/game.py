@@ -231,11 +231,20 @@ class Game:
     def accept_move(self, action: Action, amt: int=None):
         '''Accept move, handle resulting game state'''
         if self.current_pl_data.state.active():
-            self.history.add_action(self.betting_round(), self.current_pl_id, (action, amt))
-            bet = None
-
             if amt is not None and amt < 0:
                 raise InvalidMoveError('Negative bet supplied!')
+
+            if action == Action.RAISE:
+                if amt + self.chips_to_call(self.current_pl_id) == self.current_pl_data.chips:
+                    action = Action.ALL_IN
+                    amt = None
+                elif amt == 0:
+                    action = Action.CALL
+                    amt = None
+
+
+            self.history.add_action(self.betting_round(), self.current_pl_id, (action, amt))
+            bet = None
 
             if action == Action.FOLD:
                 self.current_pl_pot.fold(self.current_pl_id)
