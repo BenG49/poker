@@ -4,6 +4,7 @@ from itertools import combinations
 from typing import Callable, List, Tuple
 
 from poker.game import Game, Player
+from poker.util import count
 
 def set_cards_state(game, state):
     game._players[0].hand, game._players[1].hand = state[0]
@@ -50,6 +51,7 @@ def run_tournament(game_config: dict, rounds: int, bots: List[Tuple[Callable[[],
     losses = [0 for _ in bots]
     netmbb = [0 for _ in bots]
 
+    print('Running', count(combinations(bots, 2)), 'matchups:')
     for matchup in combinations(enumerate(bots), 2):
         i, (a, _) = matchup[0]
         j, (b, _) = matchup[1]

@@ -1,6 +1,7 @@
 '''
 main.py
 '''
+import functools
 import random
 
 from agents import bots
@@ -31,15 +32,11 @@ def run_cfr_from_file():
 def main():
     boteval.run_tournament(
         {'buy_in': 1000, 'big_blind': 20},
-        2000,
+        2_000,
         [
-            [lambda: bots.Raiser(20),    'BB Raiser'],
-            [bots.Folder,                'Folder'],
-            [bots.Checker,               'Checker'],
-            [bots.AllIn,                 'All In'],
-            [lambda: bots.Random(False), 'Random'],
-            [bots.PocketPairSeeker,      'Pocket Pair Seeker'],
-            [bots.HandValueBetter,       'Hand Value Better'],
+            (functools.partial(bots.HandValueBetter, n, p), f'Hand Value Better {n} {p}')
+            for p in range(6, 18, 2)
+            for n in range(20, 26, 2)
         ]
     )
 

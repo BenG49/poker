@@ -124,6 +124,11 @@ class PocketPairSeeker(Player):
         return Action.FOLD, None
 
 class HandValueBetter(Player):
+    def __init__(self, fold_cutoff, pair_fold_cutoff):
+        super().__init__()
+        self.fold_cutoff = fold_cutoff
+        self.pair_fold_cutoff = pair_fold_cutoff
+
     def move(self, game: Game) -> Move:
         '''[1, 14]'''
         def card_value(card: Card):
@@ -132,11 +137,13 @@ class HandValueBetter(Player):
 
         value = sum(card_value(card) for card in self.hand)
         pairs = same(map(Card.get_rank, self.hand))
-        value_cutoff = 3 if pairs else 16
+        if pairs:
+            value *= 2
+        value_cutoff = self.pair_fold_cutoff if pairs else self.fold_cutoff
         if value < value_cutoff:
             return Action.FOLD, None
 
-        pot_pct = value / 28
+        pot_pct = value / (2 * card_value(Card(Rank.ACE, 0)))
         result = int(game.current_pl_pot.total() * pot_pct)
         raise_amt = game.raise_to(self.id, result)
         if raise_amt is None:
