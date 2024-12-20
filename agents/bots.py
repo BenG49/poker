@@ -122,3 +122,24 @@ class PocketPairSeeker(Player):
         if same(map(Card.get_rank, self.hand)):
             return Action.ALL_IN, None
         return Action.FOLD, None
+
+class HandValueBetter(Player):
+    def move(self, game: Game) -> Move:
+        '''[1, 14]'''
+        def card_value(card: Card):
+            offset = 2 if card.rank == Rank.ACE else 1
+            return card.rank + offset
+
+        value = sum(card_value(card) for card in self.hand)
+        pairs = same(map(Card.get_rank, self.hand))
+        value_cutoff = 3 if pairs else 16
+        if value < value_cutoff:
+            return Action.FOLD, None
+
+        pot_pct = value / 28
+        result = int(game.current_pl_pot.total() * pot_pct)
+        raise_amt = game.raise_to(self.id, result)
+        if raise_amt is None:
+            return Action.FOLD, None
+
+        return Action.RAISE, min(raise_amt, self.chips(game) - game.chips_to_call(self.id))

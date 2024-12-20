@@ -138,11 +138,11 @@ class Player(ABC):
 
 class Game:
     '''Game'''
-    def __init__(self, buy_in: int, bigblind: int = 2):
+    def __init__(self, buy_in: int, big_blind: int = 2):
         # constants
         self.buy_in: int = buy_in
-        self.big_blind: int = bigblind
-        self.small_blind: int = bigblind // 2
+        self.big_blind: int = big_blind
+        self.small_blind: int = big_blind // 2
 
         self.state: GameState = GameState.HAND_DONE
 

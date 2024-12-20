@@ -1,6 +1,7 @@
 '''Bot evaluator'''
 
-from typing import Callable
+from itertools import combinations
+from typing import Callable, List, Tuple
 
 from poker.game import Game, Player
 
@@ -15,7 +16,10 @@ def boteval(
         game_supplier: Callable[[], Game],
         rounds: int
     ) -> float:
-    '''Evalulates two bots, returns mbb/g for player a (-mbb/g for player b)'''
+    '''
+    Evalulates two bots, returns mbb/g for player a (-mbb/g for player b).
+    Runs flipped copies of each deal iterations/2 times.
+    '''
 
     payoff = 0
     for _ in range(rounds // 2):
@@ -38,3 +42,44 @@ def boteval(
         payoff += game.pl_data[1].chips - game.buy_in
 
     return payoff / rounds / (game.big_blind / 1000.)
+
+def run_tournament(game_config: dict, rounds: int, bots: List[Tuple[Callable[[], Player], str]]):
+    '''Run round robin tournament between bots, print ranked results'''
+    wins = [0 for _ in bots]
+    ties = [0 for _ in bots]
+    losses = [0 for _ in bots]
+    netmbb = [0 for _ in bots]
+
+    for matchup in combinations(enumerate(bots), 2):
+        i, (a, _) = matchup[0]
+        j, (b, _) = matchup[1]
+        a_eval = boteval(a, b, lambda: Game(**game_config), rounds)
+
+        if a_eval == 0:
+            ties[i] += 1
+            ties[j] += 1
+        else:
+            if a_eval > 0:
+                wins[i] += 1
+                losses[j] += 1
+            else:
+                wins[j] += 1
+                losses[i] += 1
+
+            netmbb[i] += a_eval
+            netmbb[j] -= a_eval
+        print('.', end='', flush=True)
+    print('\n')
+
+    max_lengths = max(len(b[1]) for b in bots)
+    print('RESULTS:'.center(max_lengths), 'W/L/T', 'Net mbb/h')
+    print('\n'.join([
+        f'{name.ljust(max_lengths)} {w}/{l}/{t} {round(net, 3):+}'
+        for w, t, l, net, (_, name) in
+        sorted(
+            zip(wins, ties, losses, netmbb, bots),
+            # sort by wins, then less losses, then less ties, then net rating
+            key=lambda x: (x[0], -x[1], -x[2], x[3]),
+            reverse=True
+        )
+    ]))
