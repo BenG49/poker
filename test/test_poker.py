@@ -60,7 +60,7 @@ class TestHand(unittest.TestCase):
 
 class TestGame(unittest.TestCase):
     def test_player_data(self):
-        game = Game(200)
+        game = Game(200, 2)
         game.add_player(bots.Raiser(2))
         game.add_player(bots.Checker())
         game.pl_data[-1].chips = 150
@@ -99,7 +99,7 @@ class TestGame(unittest.TestCase):
     # final balances:
     #     234, 92, 98, 76
     def test_side_hand(self):
-        game = Game(200)
+        game = Game(200, 2)
         game.add_player(bots.Raiser(2))
         game.add_player(bots.Checker())
         game.pl_data[-1].chips = 150
@@ -127,7 +127,7 @@ class TestGame(unittest.TestCase):
     # final balances:
     #     10, 20, 100
     def test_side_hands(self):
-        game = Game(100)
+        game = Game(100, 2)
         game.add_player(bots.AllIn())
         game.pl_data[-1].chips = 10
         game.add_player(bots.AllIn())
@@ -151,7 +151,7 @@ class TestGame(unittest.TestCase):
     # final balances:
     #     20, 10, 100
     def test_side_hands2(self):
-        game = Game(100)
+        game = Game(100, 2)
         game.add_player(bots.AllIn())
         game.pl_data[-1].chips = 20
         game.add_player(bots.AllIn())
@@ -163,7 +163,7 @@ class TestGame(unittest.TestCase):
         self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [20, 10, 100])
 
     def test_all_fold(self):
-        game = Game(100)
+        game = Game(100, 2)
         game.add_player(bots.Folder())
         game.add_player(bots.Folder())
         game.add_player(bots.Folder())
@@ -172,25 +172,25 @@ class TestGame(unittest.TestCase):
         self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [100, 99, 101])
 
     def test_gen_moves(self):
-        game = Game(100)
+        game = Game(100, 2)
         game.add_player(bots.Checker())
         game.add_player(bots.Checker())
         game.init_hand()
         self.assertEqual(len(game.get_moves(0)), 100)
 
-        game = Game(2)
+        game = Game(2, 2)
         game.add_player(bots.Checker())
         game.add_player(bots.Checker())
         game.init_hand()
         self.assertEqual(len(game.get_moves(0)), 2)
 
-        game = Game(3)
+        game = Game(3, 2)
         game.add_player(bots.Checker())
         game.add_player(bots.Checker())
         game.init_hand()
         self.assertEqual(len(game.get_moves(0)), 3)
 
-        game = Game(4)
+        game = Game(4, 2)
         game.add_player(bots.Checker())
         game.add_player(bots.Checker())
         game.init_hand()

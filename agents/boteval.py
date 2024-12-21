@@ -51,8 +51,10 @@ def run_tournament(game_config: dict, rounds: int, bots: List[Tuple[Callable[[],
     losses = [0 for _ in bots]
     netmbb = [0 for _ in bots]
 
-    print('Running', count(combinations(bots, 2)), 'matchups:')
-    for matchup in combinations(enumerate(bots), 2):
+    loops = count(combinations(bots, 2))
+    dots = 0
+    print('Running', loops, 'matchups:')
+    for n, matchup in enumerate(combinations(enumerate(bots), 2)):
         i, (a, _) = matchup[0]
         j, (b, _) = matchup[1]
         a_eval = boteval(a, b, lambda: Game(**game_config), rounds)
@@ -70,8 +72,11 @@ def run_tournament(game_config: dict, rounds: int, bots: List[Tuple[Callable[[],
 
             netmbb[i] += a_eval
             netmbb[j] -= a_eval
-        print('.', end='', flush=True)
-    print('\n')
+
+        while dots * loops / 10 < n:
+            print('.', end='', flush=True)
+            dots += 1
+    print('.' * (10 - dots) + '\n')
 
     max_lengths = max(len(b[1]) for b in bots)
     print('RESULTS:'.center(max_lengths), 'W/L/T', 'Net mbb/h')

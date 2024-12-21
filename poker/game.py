@@ -1,5 +1,5 @@
 '''
-Classes to simulate a Texas Holdem game.
+Classes to run a N player No-Limit Texas Hold'em game.
 '''
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -137,12 +137,12 @@ class Player(ABC):
         return game.pl_data[self.id].chips
 
 class Game:
-    '''Game'''
-    def __init__(self, buy_in: int, big_blind: int = 2):
+    '''N player No-Limit Texas Hold'em'''
+    def __init__(self, buy_in: int, big_blind: int, small_blind: int=None):
         # constants
         self.buy_in: int = buy_in
         self.big_blind: int = big_blind
-        self.small_blind: int = big_blind // 2
+        self.small_blind: int = big_blind // 2 if small_blind is None else small_blind
 
         self.state: GameState = GameState.HAND_DONE
 
@@ -183,7 +183,7 @@ class Game:
             self.__bet(pl, 0)
 
         # blinds
-        if len(self._players) == 2:
+        if count(self.in_hand_players()) == 2:
             self.sb_id = self.button_id
         else:
             self.sb_id = self.next_player(self.button_id)
