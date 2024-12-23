@@ -124,11 +124,6 @@ class PocketPairSeeker(Player):
         return Action.FOLD, None
 
 class HandValueBetter(Player):
-    def __init__(self, fold_cutoff, pair_fold_cutoff):
-        super().__init__()
-        self.fold_cutoff = fold_cutoff
-        self.pair_fold_cutoff = pair_fold_cutoff
-
     def move(self, game: Game) -> Move:
         '''[1, 14]'''
         def card_value(card: Card):
@@ -139,7 +134,7 @@ class HandValueBetter(Player):
         pairs = same(map(Card.get_rank, self.hand))
         if pairs:
             value *= 2
-        value_cutoff = self.pair_fold_cutoff if pairs else self.fold_cutoff
+        value_cutoff = 12 if pairs else 24
         if value < value_cutoff:
             return Action.FOLD, None
 

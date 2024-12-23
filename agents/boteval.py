@@ -53,7 +53,7 @@ def run_tournament(game_config: dict, rounds: int, bots: List[Tuple[Callable[[],
 
     loops = count(combinations(bots, 2))
     dots = 0
-    print('Running', loops, 'matchups:')
+    print('Running', loops, 'matchups: ', end='')
     for n, matchup in enumerate(combinations(enumerate(bots), 2)):
         i, (a, _) = matchup[0]
         j, (b, _) = matchup[1]
@@ -79,14 +79,24 @@ def run_tournament(game_config: dict, rounds: int, bots: List[Tuple[Callable[[],
     print('.' * (10 - dots) + '\n')
 
     max_lengths = max(len(b[1]) for b in bots)
+    def fmt(name, record, net, best_wins):
+        def apply(color, s, apply):
+            return f'\033[1;{color}m{s}\033[0m' if apply else s
+
+        return ' '.join((
+            f'{name.ljust(max_lengths)}',
+            apply(31, f'{record[0]}/{record[1]}/{record[2]}', best_wins),
+            apply(36, f'{round(net, 3):+}',                   net == max(netmbb))
+        ))
+
     print('RESULTS:'.center(max_lengths), 'W/L/T', 'Net mbb/h')
     print('\n'.join([
-        f'{name.ljust(max_lengths)} {w}/{l}/{t} {round(net, 3):+}'
-        for w, t, l, net, (_, name) in
-        sorted(
+        fmt(name, (w, l, t), net, line == 0)
+        for line, (w, t, l, net, (_, name)) in
+        enumerate(sorted(
             zip(wins, ties, losses, netmbb, bots),
             # sort by wins, then less losses, then less ties, then net rating
             key=lambda x: (x[0], -x[1], -x[2], x[3]),
             reverse=True
-        )
+        ))
     ]))
