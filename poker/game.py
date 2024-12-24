@@ -148,15 +148,15 @@ class Game:
 
         # game state
         self.button_id: int = 0
-        self.sb_id: int = 0
-        self.bb_id: int = 0
+        self.sb_id: int = -1
+        self.bb_id: int = -1
 
         self.current_pl_id: int = 0
         self.pl_data: List[PlayerData] = []
         self.community: List[Card] = []
         self.pots: List[Pot] = [Pot(0, {})]
 
-        self.history: GameHistory = GameHistory(self.buy_in, self.big_blind, self.small_blind)
+        self.history: GameHistory = GameHistory(2, self.buy_in, self.big_blind, self.small_blind)
 
         ### PRIVATE ###
         self._players: List[Player] = []
@@ -236,10 +236,12 @@ class Game:
             if action == Action.RAISE:
                 if amt + self.chips_to_call(self.current_pl_id) == self.current_pl_data.chips:
                     action = Action.ALL_IN
-                    amt = None
                 elif amt == 0:
                     action = Action.CALL
                     amt = None
+
+            if action == Action.ALL_IN:
+                amt = self.current_pl_data.chips
 
             self.history.add_action(self.betting_round(), self.current_pl_id, (action, amt))
             bet = None
@@ -336,12 +338,15 @@ class Game:
                 for i in self.not_folded_players()
             ], key=hand, reverse=True)
 
-        for pot_n, pot in enumerate(self.pots):
+        for pot in self.pots:
             pot_rankings = [r for r in rankings if pl_id(r) in pot.players()]
             winners = [pl_id(pl) for pl in pot_rankings if hand(pl) == hand(pot_rankings[-1])]
             win_value = pot.total() // len(winners)
             remainder = pot.total() % len(winners)
-            self.history.add_result(pot_n, pot.total(), winners, hand(pot_rankings[-1]))
+
+            # transfer to winners
+            for winner in winners:
+                self.pl_data[winner].chips += win_value
 
             # give remainder to first player past button
             if remainder > 0:
@@ -350,14 +355,17 @@ class Game:
                         self.pl_data[i].chips += remainder
                         break
 
+            self.history.add_result(
+                pot.total(),
+                winners,
+                hand(pot_rankings[-1]),
+                [p.chips for p in self.pl_data]
+            )
+
             # clear pots
             pot.chips = 0
             for pl in pot.players():
                 pot.bets[pl] = 0
-
-            # transfer to winners
-            for winner in winners:
-                self.pl_data[winner].chips += win_value
 
         self.button_id = self.next_player(self.button_id, reverse=True)
         self.state = GameState.HAND_DONE
@@ -520,3 +528,4 @@ class Game:
             state=PlayerState.TO_CALL)
         )
         self._players.append(player)
+        self.history.players = len(self._players)

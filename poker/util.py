@@ -5,7 +5,7 @@ from copy import copy
 from enum import Enum, IntEnum
 from math import prod
 from random import shuffle
-from typing import List, Iterable, Optional
+from typing import Callable, List, Iterable, Optional
 
 def same(it: Iterable) -> bool:
     '''True if all items in iterable are equal'''
@@ -19,6 +19,13 @@ def same(it: Iterable) -> bool:
 def count(it: Iterable) -> int:
     '''Loops through it to find length'''
     return sum(1 for _ in it)
+
+def reorder(idx_to_idx: Callable[[int], int], l: List):
+    '''Reorders list based on index mapping idx_to_idx'''
+    out = [None] * len(l)
+    for i, item in enumerate(l):
+        out[idx_to_idx(i)] = item
+    return out
 
 class Action(Enum):
     '''

@@ -144,4 +144,6 @@ class HandValueBetter(Player):
         if raise_amt is None:
             return Action.FOLD, None
 
+        if game.chips_to_call(self.id) > self.chips(game):
+            return Action.FOLD, None
         return Action.RAISE, min(raise_amt, self.chips(game) - game.chips_to_call(self.id))
