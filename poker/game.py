@@ -50,6 +50,8 @@ class Pot:
     chips: int
     # bets in pot from current round { pl_id: chips }
     bets: Dict[int, int]
+    # amount raised (usually max bet)
+    total_raised: int
 
     ### MODIFIERS ###
     def fold(self, pl_id: int):
@@ -58,13 +60,15 @@ class Pot:
 
     def collect_bets(self):
         '''Put all bets in main pot'''
+        self.total_raised = 0
         for key, val in self.bets.items():
             self.chips += val
             self.bets[key] = 0
 
     def raised(self) -> int:
         '''The amount the pot has been raised'''
-        return max([0, *self.bets.values()])
+        self.total_raised = max(self.total_raised, 0, *self.bets.values())
+        return self.total_raised
 
     ### GETTERS ###
     def total(self) -> int:
@@ -74,6 +78,7 @@ class Pot:
     def add(self, pl_id: int, chips: int):
         '''Add chips to pl_id's bet'''
         self.bets[pl_id] = chips + self.bets.get(pl_id, 0)
+        self.total_raised = max(self.total_raised, self.bets[pl_id])
 
     def chips_to_call(self, pl_id: int) -> int:
         '''Minimum amount required to call'''
@@ -102,7 +107,7 @@ class Pot:
             self.bets[pl_id] = max_stake
             next_bets[pl_id] = bet - max_stake
 
-        return Pot(0, next_bets)
+        return Pot(0, next_bets, max(0, *next_bets.values()))
 
     def __repr__(self) -> str:
         return self.__str__()
@@ -154,7 +159,7 @@ class Game:
         self.current_pl_id: int = 0
         self.pl_data: List[PlayerData] = []
         self.community: List[Card] = []
-        self.pots: List[Pot] = [Pot(0, {})]
+        self.pots: List[Pot] = [Pot(0, {}, 0)]
 
         self.history: GameHistory = GameHistory(2, self.buy_in, self.big_blind, self.small_blind)
 
@@ -195,23 +200,14 @@ class Game:
         sb_amt = min(self.small_blind, self.pl_data[self.sb_id].chips)
         if sb_amt > 0:
             self.__bet(self.sb_id, sb_amt)
-            self.history.add_action(
-                BettingStage.PREFLOP,
-                self.sb_id,
-                (Action.ALL_IN, None) if sb_amt == self.pl_data[self.sb_id].chips
-                    else (Action.RAISE, sb_amt)
-            )
 
         # big blind
         bb_amt = min(self.big_blind, self.pl_data[self.bb_id].chips)
         if bb_amt > 0:
             self.__bet(self.bb_id, bb_amt)
-            self.history.add_action(
-                BettingStage.PREFLOP,
-                self.bb_id,
-                (Action.ALL_IN, None) if bb_amt == self.pl_data[self.bb_id].chips
-                    else (Action.RAISE, bb_amt - sb_amt)
-            )
+
+        # no matter what, rest of players have to match big blind raise
+        self.pots[-1].total_raised = self.big_blind
 
         # deal hands
         self.community = []

@@ -119,10 +119,16 @@ class GameHistory:
             lists[action.stage].append(action)
         return (lists.get(r) for r in iter(BettingStage))
 
+    def start_chips(self, hand: int) -> List[int]:
+        if hand > 0:
+            return self.results[hand - 1][-1].chips
+        return [self.buy_in] * self.players
+
     ### FILE REPR ###
 
     def export(self, file: str, hand: int=0):
-        '''TODO: add .phh extension, export to file-1, file-2 for hand 1, hand 2, if more than one hand'''
+        '''Export hand to .phh file'''
+        # TODO: add .phh extension, export to file-1, file-2 for hand 1, hand 2, if more than one hand
 
         def action_str(action: ActionEntry) -> str:
             if action.move[0] == Action.FOLD:
@@ -142,25 +148,19 @@ class GameHistory:
             open(file, 'w', encoding='utf-8').close()
             return
 
-        chips = [self.buy_in] * self.players
-        if hand > 0:
-            chips = self.results[hand - 1][-1].chips
         with open(file, 'w', encoding="utf-8") as f:
             f.write('variant = "NT"\n')
             f.write(f'antes = {[0] * self.players}\n')
             blinds = [self.small_blind, self.big_blind] + [0] * (self.players - 2)
             f.write(f'blinds_or_straddles = {blinds}\n')
             f.write('min_bet = 0\n')
-            f.write(f'starting_stacks = {chips}\n')
+            f.write(f'starting_stacks = {self.start_chips(hand)}\n')
             f.write(f'seats = {self.players}\n')
             f.write(f'hand = {hand+1}\n')
             f.write('actions = [\n')
 
             board = self.cards[hand]
-            preflop, flop, turn, river = self.actions_by_stage(hand)
-            # remove blind actions
-            if self.big_blind > 0 and self.small_blind > 0:
-                preflop = preflop[2:]
+            _, flop, turn, river = self.actions_by_stage(hand)
 
             # showing holecards
             folded = set(a.player for a in self.hand_actions(hand) if a.move[0] == Action.FOLD)
@@ -225,11 +225,15 @@ class GameHistory:
                     out += f'New Cards: {cards[card_idx:card_idx + ncards]}\n'
                     card_idx += ncards
                 elif self.big_blind > 0 and self.small_blind > 0:
-                    out += f'P{actions[0].player+1} posts small blind (${actions[0].move[1]})\n'
-                    amt = actions[0].move[1] + actions[1].move[1]
-                    out += f'P{actions[1].player+1} posts big blind (${amt})\n'
+                    if self.players == 2:
+                        bb = 1
+                        sb = 2
+                    else:
+                        sb = 1
+                        bb = 2
 
-                    actions = actions[2:]
+                    out += f'P{sb} posts small blind (${self.small_blind})\n'
+                    out += f'P{bb} posts big blind (${self.big_blind})\n'
 
                 for action in actions:
                     out += f'P{action.player+1} {action.move[0].to_str(action.move[1])}\n'

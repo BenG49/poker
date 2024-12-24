@@ -196,5 +196,15 @@ class TestGame(unittest.TestCase):
         game.init_hand()
         self.assertEqual(len(game.get_moves(0)), 4)
 
+    def test_allin_blinds(self):
+        game = Game(4, 2)
+        game.add_player(bots.Checker()) # sb
+        game.add_player(bots.Checker()) # bb
+        game.pl_data[-1].chips = 1
+        game.init_hand()
+        game.step_move()
+        self.assertEqual(game.pl_data[0].chips, 2)
+        self.assertEqual(game.pl_data[1].chips, 0)
+
 if __name__ == '__main__':
     unittest.main()
