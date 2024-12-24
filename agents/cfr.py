@@ -32,17 +32,16 @@ class CFRBot(Player):
         bet_history = ' '
 
         last_stage = BettingStage.PREFLOP
-        for t in game.history.actions:
-            if t is None:
+        for action in game.history.actions:
+            if action is None:
                 bet_history += ' '
                 last_stage = BettingStage.PREFLOP
                 continue
-            rnd, _, move = t
-            if rnd != last_stage:
-                last_stage = rnd
+            if action.stage != last_stage:
+                last_stage = action.stage
                 bet_history += '/'
 
-            bet_history += move[0].to_short_str(move[1])
+            bet_history += action.move[0].to_short_str(action.move[1])
 
         key = make_infoset_key(
             self.hand,
@@ -50,10 +49,16 @@ class CFRBot(Player):
              # most recent round betting history
             '' if len(bet_history.strip()) == 0 else bet_history.split()[-1]
         )
-        strat = self.infosets[key].strategy
+
+        # prevent crashing, folds if no infoset found
+        infoset = self.infosets.get(
+            key,
+            InfoSet(key, self.id, [(Action.FOLD, None)])
+        )
+        strat = infoset.strategy
         actions = {a: strat.get(a, 0) for a in game.get_moves(self.id)}
 
-        print(self.id, 'chose from strategy', self.infosets[key])
+        print(self.id, 'chose from strategy', infoset)
 
         return choices(
             population=list(actions.keys()),
@@ -99,7 +104,7 @@ class History:
         if self.game.state == GameState.HAND_DONE:
             return HAND_DEAL
         # check if card was dealt in game._history
-        if self.last_card_dealt_count != len(self.game.history.cards):
+        if self.last_card_dealt_count != len(self.game.history.cards[-1]):
             return BOARD_DEAL
 
         return self.game.current_pl_id
@@ -113,11 +118,11 @@ class History:
         if self.game.state == GameState.HAND_DONE:
             random.seed(0)
             self.game.init_hand()
-            self.last_card_dealt_count = len(self.game.history.cards)
+            self.last_card_dealt_count = len(self.game.history.cards[-1])
             return HAND_DEAL
         else:
             self.bet_history += '/'
-            self.last_card_dealt_count = len(self.game.history.cards)
+            self.last_card_dealt_count = len(self.game.history.cards[-1])
             return BOARD_DEAL
 
     ### INFO SETS ###

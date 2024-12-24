@@ -2,6 +2,7 @@
 Datastructure to store poker game history, works with Game from poker.game.
 Stores and loads PHH file format.
 '''
+from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 from poker import hands
@@ -10,14 +11,24 @@ from poker.util import Action, BettingStage, Card, reorder
 
 Move = Tuple[Action, Optional[int]]
 
+@dataclass
+class ActionEntry:
+    '''Entry for an action'''
+    stage: BettingStage
+    player: int
+    move: Move
+
+@dataclass
+class ResultEntry:
+    '''Entry for each result of a round (one per pot)'''
+    pot_total: int
+    winners: List[int]
+    # None if win from fold
+    winning_hand: Optional[Hand]
+    chips: List[int]
+
 class GameHistory:
     '''Datastructure to store poker game history, works with Game from poker.game'''
-
-    # round, player id, move
-    # None is end of round specifier
-    ActionTuple = Optional[Tuple[BettingStage, int, Move]]
-    # pot total, winner list (first winner gets any remainder), best hand (-1 if win from fold), chips after round
-    WinTuple = Tuple[int, List[int], Hand, List[int]]
 
     def __init__(self, players, buy_in, big_blind, small_blind):
         # assumes players all start with buy_in chips
@@ -26,16 +37,16 @@ class GameHistory:
         self.big_blind = big_blind
         self.small_blind = small_blind
 
-        self.actions: List[GameHistory.ActionTuple] = []
-        self.cards: List[List[Card]] = []
-        self._hands: List[List[Tuple[Card]]] = []
-        self.results: List[List[GameHistory.WinTuple]] = []
+        self.actions: List[Optional[ActionEntry]] = []
+        self.cards:   List[List[Card]] = []
+        self._hands:  List[List[Tuple[Card]]] = []
+        self.results: List[List[ResultEntry]] = []
 
         self.hand_count = 0
 
     ### ADD TO HISTORY ###
 
-    def add_hands(self, round_hands: List[List[Card]]):
+    def add_hands(self, round_hands: List[Tuple[Card]]):
         '''Add new round's hands to history'''
         self.hand_count += 1
         self.cards.append([])
@@ -46,7 +57,7 @@ class GameHistory:
 
     def add_action(self, stage: BettingStage, player: int, action: Move):
         '''Add player action to history'''
-        self.actions.append((
+        self.actions.append(ActionEntry(
             stage,
             self.to_history_index(self.hand_count - 1, player),
             action
@@ -64,7 +75,7 @@ class GameHistory:
 
     def add_result(self, pot_amt: int, winners: List[int], top_hand: Hand, chips: List[int]):
         '''Add result for each pot processed'''
-        self.results[-1].append((
+        self.results[-1].append(ResultEntry(
             pot_amt,
             [self.to_history_index(self.hand_count - 1, w) for w in winners],
             top_hand,
@@ -86,7 +97,7 @@ class GameHistory:
         # start is always 1 for the first hand
         return (idx - 1 + hand) % self.players
 
-    def hand_actions(self, hand: int) -> List[ActionTuple]:
+    def hand_actions(self, hand: int) -> List[Optional[ActionEntry]]:
         '''Get actions taken in specific hand'''
         h = 0
         start = 0
@@ -105,7 +116,7 @@ class GameHistory:
         '''Split actions for hand into preflop, flop, turn, and river betting stages'''
         lists = { r: [] for r in iter(BettingStage) }
         for action in self.hand_actions(hand):
-            lists[action[0]].append(action)
+            lists[action.stage].append(action)
         return (lists.get(r) for r in iter(BettingStage))
 
     ### FILE REPR ###
@@ -113,16 +124,16 @@ class GameHistory:
     def export(self, file: str, hand: int=0):
         '''TODO: add .phh extension, export to file-1, file-2 for hand 1, hand 2, if more than one hand'''
 
-        def action_str(action) -> str:
-            if action[2][0] == Action.FOLD:
+        def action_str(action: ActionEntry) -> str:
+            if action.move[0] == Action.FOLD:
                 out = 'f'
-            elif action[2][0] == Action.CALL:
+            elif action.move[0] == Action.CALL:
                 out = 'cc'
             else:
-                out = f'cbr {action[2][1]}'
-            out = f'"p{action[1]+1} {out}",'
+                out = f'cbr {action.move[1]}'
+            out = f'"p{action.player+1} {out}",'
 
-            if action[2][0] == Action.ALL_IN:
+            if action.move[0] == Action.ALL_IN:
                 out += ' # All-in'
             return out
 
@@ -133,7 +144,7 @@ class GameHistory:
 
         chips = [self.buy_in] * self.players
         if hand > 0:
-            chips = self.results[hand - 1][-1][3]
+            chips = self.results[hand - 1][-1].chips
         with open(file, 'w', encoding="utf-8") as f:
             f.write('variant = "NT"\n')
             f.write(f'antes = {[0] * self.players}\n')
@@ -148,10 +159,11 @@ class GameHistory:
             board = self.cards[hand]
             preflop, flop, turn, river = self.actions_by_stage(hand)
             # remove blind actions
-            preflop = preflop[2:]
+            if self.big_blind > 0 and self.small_blind > 0:
+                preflop = preflop[2:]
 
             # showing holecards
-            folded = set(i for _, i, (move, _) in self.hand_actions(hand) if move == Action.FOLD)
+            folded = set(a.player for a in self.hand_actions(hand) if a.move[0] == Action.FOLD)
             if len(folded) < self.players - 1:
                 showdown_stage = \
                     BettingStage.PREFLOP if len(flop) == 0 else \
@@ -212,21 +224,23 @@ class GameHistory:
                     ncards = 3 if r == BettingStage.FLOP else 1
                     out += f'New Cards: {cards[card_idx:card_idx + ncards]}\n'
                     card_idx += ncards
-                else:
-                    out += f'P{actions[0][1]} posts small blind (${actions[0][2][1]})\n'
-                    amt = actions[0][2][1] + actions[1][2][1]
-                    out += f'P{actions[1][1]} posts big blind (${amt})\n'
+                elif self.big_blind > 0 and self.small_blind > 0:
+                    out += f'P{actions[0].player+1} posts small blind (${actions[0].move[1]})\n'
+                    amt = actions[0].move[1] + actions[1].move[1]
+                    out += f'P{actions[1].player+1} posts big blind (${amt})\n'
 
                     actions = actions[2:]
 
                 for action in actions:
-                    out += f'P{action[1]} {action[2][0].to_str(action[2][1])}\n'
+                    out += f'P{action.player+1} {action.move[0].to_str(action.move[1])}\n'
 
             out += '\n'
             for result in results:
-                winners = ', '.join(map(str, result[1]))
-                desc = hands.to_str(result[2]) if result[2] > 0 else 'others folding'
-                out += f'Players [{winners}] win ${result[0]} with {desc}\n'
+                winners = ', '.join(str(w+1) for w in result.winners)
+                desc = hands.to_str(result.winning_hand) if \
+                    result.winning_hand is not None else \
+                    'others folding'
+                out += f'Players [{winners}] win ${result.pot_total} with {desc}\n'
             out += '\n'
 
         return out[:-2]

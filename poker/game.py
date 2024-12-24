@@ -324,11 +324,12 @@ class Game:
 
         # hand was ended before river, make the one person left win
         if self.not_folded_count() < 2:
+            # keep ranking of winner as None for history repr
             rankings = [
-                (self._players[pl].id, -1 if self.pl_data[pl].state.active() else 0)
+                [self._players[pl].id, None if self.pl_data[pl].state.active() else 0]
                 for pl in range(len(self._players))
             ]
-            rankings.sort(key=hand, reverse=True)
+            rankings.sort(key=lambda r: -1 if r[1] is None else r[1], reverse=True)
         else:
             # if hand was ended before river, deal rest of community
             while len(self.community) < 5:
