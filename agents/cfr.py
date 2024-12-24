@@ -7,7 +7,7 @@ from random import choices
 import random
 from typing import Dict, List
 from poker.game import Game, GameState, Move, Player, PlayerState
-from poker.util import Action, BettingRound, count
+from poker.util import Action, BettingStage, count
 
 
 ActionHistT = Move | int
@@ -31,15 +31,15 @@ class CFRBot(Player):
     def move(self, game: Game) -> Move:
         bet_history = ' '
 
-        last_round_type = BettingRound.PREFLOP
+        last_stage = BettingStage.PREFLOP
         for t in game.history.actions:
             if t is None:
                 bet_history += ' '
-                last_round_type = BettingRound.PREFLOP
+                last_stage = BettingStage.PREFLOP
                 continue
             rnd, _, move = t
-            if rnd != last_round_type:
-                last_round_type = rnd
+            if rnd != last_stage:
+                last_stage = rnd
                 bet_history += '/'
 
             bet_history += move[0].to_short_str(move[1])
@@ -136,7 +136,7 @@ class History:
     def append(self, action: ActionHistT) -> 'History':
         '''
         Bet history as string:
-        '/'   - end of betting round
+        '/'   - end of betting stage
         'rXX' - raise by XX
         'c'   - call/check
         'f'   - fold

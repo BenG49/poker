@@ -22,15 +22,15 @@ class BotTUI:
 
         while self.game.running():
             action, amt = self.game._players[self.game.current_pl_id].move(self.game)
-            start_round = self.game.betting_round()
+            start_stage = self.game.betting_stage()
 
             self.toggle_print(f' Player {self.game.current_pl_id} {action.to_str(amt)}')
 
             self.game.step_move()
 
-            if start_round != self.game.betting_round():
+            if start_stage != self.game.betting_stage():
                 self.toggle_print(str(self.game.community)[1:-1])
-                self.toggle_print(self.game.betting_round().name)
+                self.toggle_print(self.game.betting_stage().name)
 
     def run_forever(self):
         self.run_hand()

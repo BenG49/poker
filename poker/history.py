@@ -6,7 +6,7 @@ from typing import List, Optional, Tuple
 
 from poker import hands
 from poker.hands import Hand
-from poker.util import Action, BettingRound, Card, reorder
+from poker.util import Action, BettingStage, Card, reorder
 
 Move = Tuple[Action, Optional[int]]
 
@@ -15,7 +15,7 @@ class GameHistory:
 
     # round, player id, move
     # None is end of round specifier
-    ActionTuple = Optional[Tuple[BettingRound, int, Move]]
+    ActionTuple = Optional[Tuple[BettingStage, int, Move]]
     # pot total, winner list (first winner gets any remainder), best hand (-1 if win from fold), chips after round
     WinTuple = Tuple[int, List[int], Hand, List[int]]
 
@@ -44,10 +44,10 @@ class GameHistory:
             round_hands
         ))
 
-    def add_action(self, bround: BettingRound, player: int, action: Move):
+    def add_action(self, stage: BettingStage, player: int, action: Move):
         '''Add player action to history'''
         self.actions.append((
-            bround,
+            stage,
             self.to_history_index(self.hand_count - 1, player),
             action
         ))
@@ -101,12 +101,12 @@ class GameHistory:
             end += 1
         return self.actions[start:end]
 
-    def actions_by_round(self, hand: int) -> Tuple[list, list, list, list]:
-        '''Split actions for hand into preflop, flop, turn, and river betting rounds'''
-        lists = { r: [] for r in iter(BettingRound) }
+    def actions_by_stage(self, hand: int) -> Tuple[list, list, list, list]:
+        '''Split actions for hand into preflop, flop, turn, and river betting stages'''
+        lists = { r: [] for r in iter(BettingStage) }
         for action in self.hand_actions(hand):
             lists[action[0]].append(action)
-        return (lists.get(r) for r in iter(BettingRound))
+        return (lists.get(r) for r in iter(BettingStage))
 
     ### FILE REPR ###
 
@@ -146,40 +146,40 @@ class GameHistory:
             f.write('actions = [\n')
 
             board = self.cards[hand]
-            preflop, flop, turn, river = self.actions_by_round(hand)
+            preflop, flop, turn, river = self.actions_by_stage(hand)
             # remove blind actions
             preflop = preflop[2:]
 
             # showing holecards
             folded = set(i for _, i, (move, _) in self.hand_actions(hand) if move == Action.FOLD)
             if len(folded) < self.players - 1:
-                showdown_round = \
-                    BettingRound.PREFLOP if len(flop) == 0 else \
-                    BettingRound.FLOP if len(turn) == 0 else    \
-                    BettingRound.TURN if len(river) == 0 else   \
-                    BettingRound.RIVER
+                showdown_stage = \
+                    BettingStage.PREFLOP if len(flop) == 0 else \
+                    BettingStage.FLOP if len(turn) == 0 else    \
+                    BettingStage.TURN if len(river) == 0 else   \
+                    BettingStage.RIVER
                 showdown_string = ''.join(
                     f'  "p{i+1} sm {self._hands[hand][i][0]}{self._hands[hand][i][1]}",\n'
                     for i in range(self.players)
                     if i not in folded
                 )
             else:
-                showdown_round = None
+                showdown_stage = None
                 showdown_string = ''
 
-            for r, actions in zip(iter(BettingRound), self.actions_by_round(hand)):
-                if r == BettingRound.PREFLOP:
+            for r, actions in zip(iter(BettingStage), self.actions_by_stage(hand)):
+                if r == BettingStage.PREFLOP:
                     f.write(f'  # {r.name}\n')
                     # deal hands
                     for i, hole in enumerate(self._hands[hand]):
                         f.write(f'  "d dh p{i+1} {hole[0]}{hole[1]}",\n')
                 else:
                     try:
-                        if r == BettingRound.FLOP:
+                        if r == BettingStage.FLOP:
                             cards = (board[0], board[1], board[2])
-                        elif r == BettingRound.TURN:
+                        elif r == BettingStage.TURN:
                             cards = (board[3],)
-                        elif r == BettingRound.RIVER:
+                        elif r == BettingStage.RIVER:
                             cards = (board[4],)
                     except IndexError:
                         break
@@ -190,7 +190,7 @@ class GameHistory:
                 for a in actions:
                     f.write(f'  {action_str(a)}\n')
 
-                if showdown_round == r:
+                if showdown_stage == r:
                     f.write(showdown_string)
 
             f.write(']\n')
@@ -199,18 +199,17 @@ class GameHistory:
         out = ''
 
         for i, (hand, cards, results) in enumerate(zip(self._hands, self.cards, self.results)):
-            rounds = self.actions_by_round(i)
             out += 'Hands: ' + str(hand) + '\n'
 
             card_idx = 0
-            for r, actions in zip(iter(BettingRound), rounds):
+            for r, actions in zip(iter(BettingStage), self.actions_by_stage(i)):
                 if len(actions) == 0 and len(cards[card_idx:]) == 0:
                     continue
 
                 out += '\n' + r.name + '\n'
 
-                if r != BettingRound.PREFLOP:
-                    ncards = 3 if r == BettingRound.FLOP else 1
+                if r != BettingStage.PREFLOP:
+                    ncards = 3 if r == BettingStage.FLOP else 1
                     out += f'New Cards: {cards[card_idx:card_idx + ncards]}\n'
                     card_idx += ncards
                 else:

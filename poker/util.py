@@ -60,7 +60,7 @@ class Action(Enum):
             Action.FOLD: 'f'
         }[self]
 
-class BettingRound(Enum):
+class BettingStage(Enum):
     PREFLOP = 0
     FLOP = 1
     TURN = 2

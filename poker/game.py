@@ -9,7 +9,7 @@ from typing import Iterator, List, Dict, Tuple, Optional, Self
 from poker import hands
 from .hands import Hand
 from .history import GameHistory
-from .util import Action, BettingRound, Card, Deck, count, same
+from .util import Action, BettingStage, Card, Deck, count, same
 
 Move = Tuple[Action, Optional[int]]
 
@@ -19,7 +19,7 @@ class InvalidMoveError(ValueError): ...
 
 class PlayerState(Enum):
     '''
-    Stores player's state for the current betting round
+    Stores player's state for the current betting stage
 
     TO_CALL: still has to call, check, or raise
     MOVED:   called, checked, or raised
@@ -34,7 +34,7 @@ class PlayerState(Enum):
     OUT = 4
 
     def active(self) -> bool:
-        '''True if player will still make moves in future betting rounds'''
+        '''True if player will still make moves in future betting stages'''
         return self in (PlayerState.TO_CALL, PlayerState.MOVED)
 
 class GameState(Enum):
@@ -46,7 +46,7 @@ class GameState(Enum):
 # to fold a player, their bet just goes into the pot and they are removed from every pot
 @dataclass
 class Pot:
-    # chips in pot from previous betting rounds
+    # chips in pot from previous betting stages
     chips: int
     # bets in pot from current round { pl_id: chips }
     bets: Dict[int, int]
@@ -68,7 +68,7 @@ class Pot:
 
     ### GETTERS ###
     def total(self) -> int:
-        '''Total chips in pot from all rounds'''
+        '''Total chips in pot from all hands'''
         return self.chips + sum(self.bets.values())
 
     def add(self, pl_id: int, chips: int):
@@ -178,6 +178,8 @@ class Game:
             return
         self.state = GameState.RUNNING
 
+        # TODO: check if pots should be reset here: probably some bugs with that for multiple rounds
+
         # add all players to pot in case game instantly ends
         for pl in self.in_hand_players():
             self.__bet(pl, 0)
@@ -194,7 +196,7 @@ class Game:
         if sb_amt > 0:
             self.__bet(self.sb_id, sb_amt)
             self.history.add_action(
-                BettingRound.PREFLOP,
+                BettingStage.PREFLOP,
                 self.sb_id,
                 (Action.ALL_IN, None) if sb_amt == self.pl_data[self.sb_id].chips
                     else (Action.RAISE, sb_amt)
@@ -205,7 +207,7 @@ class Game:
         if bb_amt > 0:
             self.__bet(self.bb_id, bb_amt)
             self.history.add_action(
-                BettingRound.PREFLOP,
+                BettingStage.PREFLOP,
                 self.bb_id,
                 (Action.ALL_IN, None) if bb_amt == self.pl_data[self.bb_id].chips
                     else (Action.RAISE, bb_amt - sb_amt)
@@ -243,7 +245,7 @@ class Game:
             if action == Action.ALL_IN:
                 amt = self.current_pl_data.chips
 
-            self.history.add_action(self.betting_round(), self.current_pl_id, (action, amt))
+            self.history.add_action(self.betting_stage(), self.current_pl_id, (action, amt))
             bet = None
 
             if action == Action.FOLD:
@@ -282,7 +284,7 @@ class Game:
             self.end_round()
 
     def end_round(self):
-        '''Called at the end of a betting round'''
+        '''Called at the end of a betting stage'''
         # clear remaining bets into most up to date pot
         split = self.pots[-1].split()
         self.pots[-1].collect_bets()
@@ -303,12 +305,12 @@ class Game:
         self.current_pl_id = self.next_player(self.bb_id)
 
         # check if only one player remaining or showdown
-        if count(self.active_players()) < 2 or self.betting_round() == BettingRound.RIVER:
+        if count(self.active_players()) < 2 or self.betting_stage() == BettingStage.RIVER:
             self.end_hand()
 
         # deal next round
-        elif self.betting_round() != BettingRound.RIVER:
-            ncards = 3 if self.betting_round() == BettingRound.PREFLOP else 1
+        elif self.betting_stage() != BettingStage.RIVER:
+            ncards = 3 if self.betting_stage() == BettingStage.PREFLOP else 1
             self.community += self.history.deal(self._deck.deal(ncards))
 
     def end_hand(self):
@@ -330,7 +332,7 @@ class Game:
         else:
             # if hand was ended before river, deal rest of community
             while len(self.community) < 5:
-                ncards = 3 if self.betting_round() == BettingRound.PREFLOP else 1
+                ncards = 3 if self.betting_stage() == BettingStage.PREFLOP else 1
                 self.community += self.history.deal(self._deck.deal(ncards))
 
             rankings = sorted([
@@ -394,13 +396,13 @@ class Game:
     def running(self) -> bool:
         return self.state == GameState.RUNNING
 
-    def betting_round(self) -> BettingRound:
-        '''What the current betting round is'''
+    def betting_stage(self) -> BettingStage:
+        '''What the current betting stage is'''
         return {
-            0: BettingRound.PREFLOP,
-            3: BettingRound.FLOP,
-            4: BettingRound.TURN,
-            5: BettingRound.RIVER
+            0: BettingStage.PREFLOP,
+            3: BettingStage.FLOP,
+            4: BettingStage.TURN,
+            5: BettingStage.RIVER
         }[len(self.community)]
 
     def raise_to(self, pl_id: int, raise_to: int) -> Optional[int]:

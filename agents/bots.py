@@ -4,7 +4,7 @@ Stores all poker bots
 import random
 from typing import List
 from poker import hands
-from poker.game import Action, BettingRound, Game, Move, Player
+from poker.game import Action, BettingStage, Game, Move, Player
 from poker.hands import HandType
 from poker.util import Card, Deck, Rank, same
 
@@ -73,8 +73,8 @@ class TerminalPlayer(Player):
 
 class EquityBot(Player):
     @staticmethod
-    def equity(betting_round: BettingRound, hand: List[Card], community: List[Card]) -> float:
-        if betting_round == BettingRound.PREFLOP:
+    def equity(stage: BettingStage, hand: List[Card], community: List[Card]) -> float:
+        if stage == BettingStage.PREFLOP:
             def value(r: Rank) -> int:
                 return r + 3 if r == Rank.ACE else r + 2
             ranks = list(map(Card.get_rank, hand))
@@ -109,7 +109,7 @@ class EquityBot(Player):
         return self_pot.chips_to_call(self.id) / total
 
     def move(self, game: Game) -> Move:
-        eq = EquityBot.equity(game.betting_round(), self.hand, game.community)
+        eq = EquityBot.equity(game.betting_stage(), self.hand, game.community)
         po = self.pot_odds(game)
 
         if eq < po:
