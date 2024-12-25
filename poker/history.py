@@ -5,11 +5,16 @@ Stores and loads PHH file format.
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
+from pip._vendor.tomli import load
+
 from poker import hands
 from poker.hands import Hand
-from poker.util import Action, BettingStage, Card, reorder
+from poker.util import Action, BettingStage, Card, count, reorder, same
 
 Move = Tuple[Action, Optional[int]]
+
+class PHHParseError(ValueError):
+    '''Error parsing .phh file'''
 
 @dataclass
 class ActionEntry:
@@ -18,6 +23,11 @@ class ActionEntry:
     player: int
     move: Move
 
+    def __str__(self) -> str:
+        return f'P{self.player} {self.move[0].to_str(self.move[1])}'
+    def __repr__(self) -> str:
+        return f'{self.stage.name} P{self.player} {self.move[0].to_str(self.move[1])}'
+
 @dataclass
 class ResultEntry:
     '''Entry for each result of a round (one per pot)'''
@@ -25,10 +35,125 @@ class ResultEntry:
     winners: List[int]
     # None if win from fold
     winning_hand: Optional[Hand]
-    chips: List[int]
 
+    def __str__(self) -> str:
+        winners = ', '.join(str(w+1) for w in self.winners)
+        desc = hands.to_str(self.winning_hand) if \
+            self.winning_hand is not None else \
+            'others folding'
+        return f'Players [{winners}] win ${self.pot_total} with {desc}'
+
+# FIXME: replace buy_in with starting_chips
 class GameHistory:
     '''Datastructure to store poker game history, works with Game from poker.game'''
+
+    @staticmethod
+    def import_phh(file: str) -> 'GameHistory':
+        '''
+        Construct GameHistory from .phh file.
+        Does not handle ?? for holecards.
+        '''
+        def parse_cardstr(s: str) -> List[Card]:
+            out = []
+            while len(s) > 0:
+                out.append(Card.new(s[:2]))
+                s = s[2:]
+            return out
+
+        with open(file, 'rb') as f:
+            data = load(f)
+
+        if data['variant'] != 'NT':
+            raise PHHParseError('Game variant not supported!')
+        if any(a != 0 for a in data['antes']):
+            raise PHHParseError('Nonzero antes not supported!')
+        if data['min_bet'] != 0:
+            raise PHHParseError('Nonzero min bet not supported!')
+
+        out = GameHistory(
+            len(data['antes']),
+            buy_in=data['starting_stacks'][0],
+            small_blind=data['blinds_or_straddles'][0],
+            big_blind=data['blinds_or_straddles'][1]
+        )
+        out.hand_count = 1
+        out.cards.append([])
+        out._hands.append([None] * out.players)
+
+        # keep track of pots for results
+        fold_chips = [0]
+        # FIXME: change with starting chips
+        pots = [{p: out.big_blind for p in range(out.players)}]
+
+        stage_it = iter(BettingStage)
+        stage = next(stage_it)
+        for action in data['actions']:
+            actor, a_type, *args = action.split()
+
+            if actor == 'd':
+                if a_type == 'dh':
+                    out._hands[-1][int(args[0][1])-1] = tuple(parse_cardstr(args[1]))
+                elif a_type == 'db':
+                    out.cards[-1] += parse_cardstr(args[0])
+                    stage = next(stage_it)
+                else:
+                    raise PHHParseError('Invalid dealer action!')
+
+                continue
+
+            player = int(actor[1]) - 1
+            if a_type == 'cbr':
+                pots[-1][player] = max(pots[-1].values()) + int(args[0])
+
+                out.actions.append(ActionEntry(stage, player, (Action.RAISE, int(args[0]))))
+            elif a_type == 'cc':
+                pots[-1][player] = max(pots[-1].values())
+
+                out.actions.append(ActionEntry(stage, player, (Action.CALL, None)))
+            elif a_type == 'f':
+                # move chips to folded pot
+                for i, p in enumerate(pots):
+                    fold_chips[i] += p.pop(player, 0)
+
+                out.actions.append(ActionEntry(stage, player, (Action.FOLD, None)))
+
+        # split pot
+        while not same(pots[-1].values()):
+            max_bet = min(pots[-1].values())
+            pots.append({})
+            for pl, bet in pots[-2].items():
+                if bet > max_bet:
+                    pots[-2][pl] = max_bet
+                    pots[-1][pl] = bet - max_bet
+
+        out.end_hand()
+
+        # one person + folded chips remaining
+        if count(pots[0].keys()) == 1:
+            winner = next(pots[0].keys())
+            out.results[-1].append(ResultEntry(
+                sum(c + sum(p.values()) for c, p in zip(fold_chips, pots)),
+                [winner],
+                None
+            ))
+        # create rankings
+        else:
+            rankings = sorted([
+                (i, hands.evaluate([*out.cards[0], *out._hands[0][i]]))
+                for i in pots[0].keys()
+            ], key=lambda x: x[1], reverse=True)
+
+            for c, p in zip(fold_chips, pots):
+                pot_rankings = [r for r in rankings if r[0] in p.keys()]
+                winners = [p for p, h in pot_rankings if h == pot_rankings[-1][1]]
+                out.results[-1].append(ResultEntry(
+                    c + sum(p.values()),
+                    winners,
+                    pot_rankings[-1][1]
+                ))
+
+        return out
+
 
     def __init__(self, players, buy_in, big_blind, small_blind):
         # assumes players all start with buy_in chips
@@ -73,16 +198,12 @@ class GameHistory:
         self.results.append([])
         self.actions.append(None)
 
-    def add_result(self, pot_amt: int, winners: List[int], top_hand: Hand, chips: List[int]):
+    def add_result(self, pot_amt: int, winners: List[int], top_hand: Hand):
         '''Add result for each pot processed'''
         self.results[-1].append(ResultEntry(
             pot_amt,
             [self.to_history_index(self.hand_count - 1, w) for w in winners],
-            top_hand,
-            reorder(
-                lambda idx: self.to_history_index(self.hand_count - 1, idx),
-                chips
-            )
+            top_hand
         ))
 
     ### UTIL ###
@@ -96,6 +217,17 @@ class GameHistory:
         '''Convert from history index (dealing order) to game index (seats)'''
         # start is always 1 for the first hand
         return (idx - 1 + hand) % self.players
+
+    def actions_by_hand(self) -> List[List[Optional[ActionEntry]]]:
+        '''Split actions into actions per hand'''
+        out = [[] for _ in range(self.hand_count)]
+        i = 0
+        for a in self.actions:
+            if a is None:
+                i += 1
+            else:
+                out[i].append(a)
+        return out
 
     def hand_actions(self, hand: int) -> List[Optional[ActionEntry]]:
         '''Get actions taken in specific hand'''
@@ -120,13 +252,12 @@ class GameHistory:
         return (lists.get(r) for r in iter(BettingStage))
 
     def start_chips(self, hand: int) -> List[int]:
-        if hand > 0:
-            return self.results[hand - 1][-1].chips
+        # FIXME: change after start chips is changed
         return [self.buy_in] * self.players
 
     ### FILE REPR ###
 
-    def export(self, file: str, hand: int=0):
+    def export_phh(self, file: str, hand: int=0):
         '''Export hand to .phh file'''
         # TODO: add .phh extension, export to file-1, file-2 for hand 1, hand 2, if more than one hand
 
@@ -145,7 +276,7 @@ class GameHistory:
 
         # there are not enough hands to export requested hand
         if self.hand_count < hand + 1:
-            open(file, 'w', encoding='utf-8').close()
+            open(file, 'wb').close()
             return
 
         with open(file, 'w', encoding="utf-8") as f:

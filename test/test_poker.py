@@ -1,11 +1,13 @@
 '''
 Unit testing for util.py and game.py
 '''
+from os import remove
 import unittest
 import random
 
 from agents import bots
 from poker.hands import evaluate, Hand
+from poker.history import GameHistory
 from poker.util import Card, count, same
 from poker.game import Game
 
@@ -205,6 +207,29 @@ class TestGame(unittest.TestCase):
         game.step_move()
         self.assertEqual(game.pl_data[0].chips, 2)
         self.assertEqual(game.pl_data[1].chips, 0)
+
+class TestHistory(unittest.TestCase):
+    def test_import_export(self):
+        game = Game(1000, 20)
+        game.add_player(bots.HandValueBetter())
+        game.add_player(bots.Checker())
+        random.seed(12)
+        game.step_hand()
+
+        game.history.export_phh('__test.phh')
+        imported = GameHistory.import_phh('__test.phh')
+
+        self.assertEqual(game.history.players, imported.players)
+        self.assertEqual(game.history.buy_in, imported.buy_in)
+        self.assertEqual(game.history.small_blind, imported.small_blind)
+        self.assertEqual(game.history.big_blind, imported.big_blind)
+
+        self.assertEqual(game.history.actions, imported.actions)
+        self.assertEqual(game.history.cards, imported.cards)
+        self.assertEqual(game.history._hands, imported._hands)
+        self.assertEqual(game.history.results, imported.results)
+
+        remove('__test.phh')
 
 if __name__ == '__main__':
     unittest.main()

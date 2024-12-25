@@ -7,14 +7,14 @@ from enum import Enum
 from typing import Iterator, List, Dict, Tuple, Optional, Self
 
 from poker import hands
-from .hands import Hand
 from .history import GameHistory
 from .util import Action, BettingStage, Card, Deck, count, same
 
 Move = Tuple[Action, Optional[int]]
 
 
-class InvalidMoveError(ValueError): ...
+class InvalidMoveError(ValueError):
+    '''Invalid move supplied to game (e.g. negative raise)'''
 
 
 class PlayerState(Enum):
@@ -128,6 +128,8 @@ class PlayerData:
         else:
             self.state = PlayerState.TO_CALL
 
+        self.latest_pot = 0
+
 class Player(ABC):
     '''Abstract base class for players'''
     def __init__(self):
@@ -149,14 +151,14 @@ class Game:
         self.big_blind: int = big_blind
         self.small_blind: int = big_blind // 2 if small_blind is None else small_blind
 
+        # game state
         self.state: GameState = GameState.HAND_DONE
 
-        # game state
-        self.button_id: int = 0
         self.sb_id: int = -1
         self.bb_id: int = -1
+        self.button_id: int = 0
+        self.current_pl_id: int = -1
 
-        self.current_pl_id: int = 0
         self.pl_data: List[PlayerData] = []
         self.community: List[Card] = []
         self.pots: List[Pot] = [Pot(0, {}, 0)]
@@ -183,7 +185,7 @@ class Game:
             return
         self.state = GameState.RUNNING
 
-        # TODO: check if pots should be reset here: probably some bugs with that for multiple rounds
+        self.pots = [Pot(0, {}, 0)]
 
         # add all players to pot in case game instantly ends
         for pl in self.in_hand_players():
@@ -301,7 +303,8 @@ class Game:
         self.current_pl_id = self.next_player(self.bb_id)
 
         # check if only one player remaining or showdown
-        if count(self.active_players()) < 2 or self.betting_stage() == BettingStage.RIVER:
+        if count(self.pl_iter(include_states=(PlayerState.MOVED, PlayerState.TO_CALL))) < 2 or \
+           self.betting_stage() == BettingStage.RIVER:
             self.end_hand()
 
         # deal next round
@@ -311,21 +314,16 @@ class Game:
 
     def end_hand(self):
         '''Called at the end of a hand (showdown or one player remaining)'''
-        def pl_id(t: Tuple[int, Hand]):
-            return t[0]
-        def hand(t: Tuple[int, Hand]):
-            return t[1]
-
         self.history.end_hand()
 
         # hand was ended before river, make the one person left win
         if self.not_folded_count() < 2:
-            # keep ranking of winner as None for history repr
-            rankings = [
-                [self._players[pl].id, None if self.pl_data[pl].state.active() else 0]
-                for pl in range(len(self._players))
-            ]
-            rankings.sort(key=lambda r: -1 if r[1] is None else r[1], reverse=True)
+            winner = [i for i, p in enumerate(self.pl_data) if p.state != PlayerState.FOLDED][0]
+            total = sum(p.total() for p in self.pots)
+
+            self.history.add_result(total, [winner], None)
+
+            self.pl_data[winner].chips += total
         else:
             # if hand was ended before river, deal rest of community
             while len(self.community) < 5:
@@ -335,36 +333,26 @@ class Game:
             rankings = sorted([
                 (i, hands.evaluate([*self.community, *self._players[i].hand]))
                 for i in self.not_folded_players()
-            ], key=hand, reverse=True)
+            ], key=lambda x: x[1])
 
-        for pot in self.pots:
-            pot_rankings = [r for r in rankings if pl_id(r) in pot.players()]
-            winners = [pl_id(pl) for pl in pot_rankings if hand(pl) == hand(pot_rankings[-1])]
-            win_value = pot.total() // len(winners)
-            remainder = pot.total() % len(winners)
+            for pot in self.pots:
+                pot_rankings = [(p, r) for p, r in rankings if p in pot.players()]
+                winners = [p for p, r in pot_rankings if r == pot_rankings[0][1]]
+                win_value = pot.total() // len(winners)
+                remainder = pot.total() % len(winners)
 
-            # transfer to winners
-            for winner in winners:
-                self.pl_data[winner].chips += win_value
+                self.history.add_result(pot.total(), winners, pot_rankings[0][1])
 
-            # give remainder to first player past button
-            if remainder > 0:
-                for i in self.pl_iter(start=self.button_id, skip_start=True):
-                    if i in winners:
-                        self.pl_data[i].chips += remainder
-                        break
+                # transfer to winners
+                for winner in winners:
+                    self.pl_data[winner].chips += win_value
 
-            self.history.add_result(
-                pot.total(),
-                winners,
-                hand(pot_rankings[-1]),
-                [p.chips for p in self.pl_data]
-            )
-
-            # clear pots
-            pot.chips = 0
-            for pl in pot.players():
-                pot.bets[pl] = 0
+                # give remainder to first player past button
+                if remainder > 0:
+                    for i in self.pl_iter(start=self.button_id, skip_start=True):
+                        if i in winners:
+                            self.pl_data[i].chips += remainder
+                            break
 
         self.button_id = self.next_player(self.button_id, reverse=True)
         self.state = GameState.HAND_DONE
@@ -481,28 +469,6 @@ class Game:
         return self.pl_iter(
             start, reverse,
             exclude_states=(PlayerState.OUT, PlayerState.FOLDED),
-            skip_start=skip_start
-        )
-
-    def pldata_iter(
-        self,
-        start=None,
-        reverse=False,
-        include_states=tuple(PlayerState),
-        exclude_states=(),
-        skip_start=False
-    ) -> Iterator[int]:
-        '''pl_iter over pl_data'''
-        return map(
-            lambda i: self.pl_data[i],
-            self.pl_iter(start, reverse, include_states, exclude_states, skip_start)
-        )
-
-    def active_players(self, start=None, reverse=False, skip_start=False) -> Iterator[PlayerData]:
-        '''Wrap pldata_iter for players that can make moves in the future'''
-        return self.pldata_iter(
-            start, reverse,
-            include_states=(PlayerState.MOVED, PlayerState.TO_CALL),
             skip_start=skip_start
         )
 
