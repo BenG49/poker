@@ -163,7 +163,7 @@ class Game:
         self.community: List[Card] = []
         self.pots: List[Pot] = [Pot(0, {}, 0)]
 
-        self.history: GameHistory = GameHistory(2, self.buy_in, self.big_blind, self.small_blind)
+        self.history: GameHistory = GameHistory(self.big_blind, self.small_blind)
 
         ### PRIVATE ###
         self._players: List[Player] = []
@@ -191,6 +191,19 @@ class Game:
         for pl in self.in_hand_players():
             self.__bet(pl, 0)
 
+        # deal hands
+        self.community = []
+        for pl in self._players:
+            pl.hand = []
+        self._deck.shuffle()
+        for p in self._players:
+            p.hand = tuple(self._deck.deal(2))
+
+        self.history.init_hand(
+            [pl.chips for pl in self.pl_data],
+            [pl.hand for pl in self._players]
+        )
+
         # blinds
         if count(self.in_hand_players()) == 2:
             self.sb_id = self.button_id
@@ -210,16 +223,6 @@ class Game:
 
         # no matter what, rest of players have to match big blind raise
         self.pots[-1].total_raised = self.big_blind
-
-        # deal hands
-        self.community = []
-        for pl in self._players:
-            pl.hand = []
-        self._deck.shuffle()
-        for p in self._players:
-            p.hand = tuple(self._deck.deal(2))
-
-        self.history.add_hands([pl.hand for pl in self._players])
 
         self.current_pl_id = self.next_player(self.bb_id)
 

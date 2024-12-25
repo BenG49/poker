@@ -220,7 +220,6 @@ class TestHistory(unittest.TestCase):
         imported = GameHistory.import_phh('__test.phh')
 
         self.assertEqual(game.history.players, imported.players)
-        self.assertEqual(game.history.buy_in, imported.buy_in)
         self.assertEqual(game.history.small_blind, imported.small_blind)
         self.assertEqual(game.history.big_blind, imported.big_blind)
 
@@ -228,6 +227,7 @@ class TestHistory(unittest.TestCase):
         self.assertEqual(game.history.cards, imported.cards)
         self.assertEqual(game.history._hands, imported._hands)
         self.assertEqual(game.history.results, imported.results)
+        self.assertEqual(game.history.chips, imported.chips)
 
         remove('__test.phh')
 

@@ -43,7 +43,6 @@ class ResultEntry:
             'others folding'
         return f'Players [{winners}] win ${self.pot_total} with {desc}'
 
-# FIXME: replace buy_in with starting_chips
 class GameHistory:
     '''Datastructure to store poker game history, works with Game from poker.game'''
 
@@ -71,19 +70,18 @@ class GameHistory:
             raise PHHParseError('Nonzero min bet not supported!')
 
         out = GameHistory(
-            len(data['antes']),
-            buy_in=data['starting_stacks'][0],
             small_blind=data['blinds_or_straddles'][0],
             big_blind=data['blinds_or_straddles'][1]
         )
         out.hand_count = 1
         out.cards.append([])
+        out.chips.append(data['starting_stacks'])
+        out.players = len(out.chips[0])
         out._hands.append([None] * out.players)
 
         # keep track of pots for results
         fold_chips = [0]
-        # FIXME: change with starting chips
-        pots = [{p: out.big_blind for p in range(out.players)}]
+        pots = [{p: min(out.big_blind, out.chips[0][p]) for p in range(out.players)}]
 
         stage_it = iter(BettingStage)
         stage = next(stage_it)
@@ -92,9 +90,9 @@ class GameHistory:
 
             if actor == 'd':
                 if a_type == 'dh':
-                    out._hands[-1][int(args[0][1])-1] = tuple(parse_cardstr(args[1]))
+                    out._hands[0][int(args[0][1])-1] = tuple(parse_cardstr(args[1]))
                 elif a_type == 'db':
-                    out.cards[-1] += parse_cardstr(args[0])
+                    out.cards[0] += parse_cardstr(args[0])
                     stage = next(stage_it)
                 else:
                     raise PHHParseError('Invalid dealer action!')
@@ -141,27 +139,26 @@ class GameHistory:
             rankings = sorted([
                 (i, hands.evaluate([*out.cards[0], *out._hands[0][i]]))
                 for i in pots[0].keys()
-            ], key=lambda x: x[1], reverse=True)
+            ], key=lambda x: x[1])
 
             for c, p in zip(fold_chips, pots):
                 pot_rankings = [r for r in rankings if r[0] in p.keys()]
-                winners = [p for p, h in pot_rankings if h == pot_rankings[-1][1]]
+                winners = [p for p, h in pot_rankings if h == pot_rankings[0][1]]
                 out.results[-1].append(ResultEntry(
                     c + sum(p.values()),
                     winners,
-                    pot_rankings[-1][1]
+                    pot_rankings[0][1]
                 ))
 
         return out
 
 
-    def __init__(self, players, buy_in, big_blind, small_blind):
-        # assumes players all start with buy_in chips
-        self.players = players
-        self.buy_in = buy_in
+    def __init__(self, big_blind, small_blind):
+        self.players = -1
         self.big_blind = big_blind
         self.small_blind = small_blind
 
+        self.chips:   List[List[int]] = []
         self.actions: List[Optional[ActionEntry]] = []
         self.cards:   List[List[Card]] = []
         self._hands:  List[List[Tuple[Card]]] = []
@@ -171,14 +168,16 @@ class GameHistory:
 
     ### ADD TO HISTORY ###
 
-    def add_hands(self, round_hands: List[Tuple[Card]]):
+    def __reorder_new_list(self, l: list) -> list:
+        return reorder(lambda idx: self.to_history_index(self.hand_count - 1, idx), l)
+
+    def init_hand(self, chips: List[int], round_hands: List[Tuple[Card]]):
         '''Add new round's hands to history'''
+        self.players = len(chips)
         self.hand_count += 1
         self.cards.append([])
-        self._hands.append(reorder(
-            lambda idx: self.to_history_index(self.hand_count - 1, idx),
-            round_hands
-        ))
+        self._hands.append(self.__reorder_new_list(round_hands))
+        self.chips.append(self.__reorder_new_list(chips))
 
     def add_action(self, stage: BettingStage, player: int, action: Move):
         '''Add player action to history'''
@@ -251,10 +250,6 @@ class GameHistory:
             lists[action.stage].append(action)
         return (lists.get(r) for r in iter(BettingStage))
 
-    def start_chips(self, hand: int) -> List[int]:
-        # FIXME: change after start chips is changed
-        return [self.buy_in] * self.players
-
     ### FILE REPR ###
 
     def export_phh(self, file: str, hand: int=0):
@@ -285,7 +280,7 @@ class GameHistory:
             blinds = [self.small_blind, self.big_blind] + [0] * (self.players - 2)
             f.write(f'blinds_or_straddles = {blinds}\n')
             f.write('min_bet = 0\n')
-            f.write(f'starting_stacks = {self.start_chips(hand)}\n')
+            f.write(f'starting_stacks = {self.chips[hand]}\n')
             f.write(f'seats = {self.players}\n')
             f.write(f'hand = {hand+1}\n')
             f.write('actions = [\n')
