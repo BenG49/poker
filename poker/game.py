@@ -12,7 +12,6 @@ from .util import Action, BettingStage, Card, Deck, count, same
 
 Move = Tuple[Action, Optional[int]]
 
-
 class InvalidMoveError(ValueError):
     '''Invalid move supplied to game (e.g. negative raise)'''
 
@@ -112,7 +111,8 @@ class Pot:
     def __repr__(self) -> str:
         return self.__str__()
     def __str__(self) -> str:
-        return f'(${self.chips} {", ".join(f"PL{p}:${b}" for p, b in self.bets.items())})'
+        bets = ', '.join(f'P{p}:${b}' for p, b in sorted(self.bets.items()))
+        return f'(${self.chips}{" " if bets else ""}{bets})'
 
 @dataclass
 class PlayerData:
@@ -143,8 +143,47 @@ class Player(ABC):
     def chips(self, game) -> int:
         return game.pl_data[self.id].chips
 
+class EmptyPlayer(Player):
+    '''Empty Player impl'''
+    def move(self, _):
+        ...
+
 class Game:
     '''N player No-Limit Texas Hold'em'''
+
+    @staticmethod
+    def replay(history: GameHistory, hand: int=0) -> Iterator['Game']:
+        '''Replays game history with an iterator through each game state'''
+        # NOTE: does not yield state between last move and showdown
+
+        game = Game(0, history.big_blind, history.small_blind)
+        for _ in range(history.players):
+            game.add_player(EmptyPlayer())
+
+        for h, actions in enumerate(history.actions_by_hand()):
+            # init chips
+            for i, c in enumerate(history.chips[hand]):
+                game.pl_data[history.to_game_index(h, i)].chips = c
+
+            game.init_hand()
+            # init hands, poke history
+            game.history._hands[hand] = history._hands[hand]
+            for i, hand_ in enumerate(history._hands[hand]):
+                game._players[history.to_game_index(h, i)].hand = hand_
+
+            yield game
+
+            for action in actions:
+                len_before = len(game.community)
+
+                game.accept_move(*action.move)
+
+                if len_before != len(game.community):
+                    for i in range(len_before, len(game.community)):
+                        game.community[i] = history.cards[hand][i]
+
+                yield game
+
     def __init__(self, buy_in: int, big_blind: int, small_blind: int=None):
         # constants
         self.buy_in: int = buy_in
@@ -357,6 +396,8 @@ class Game:
                             self.pl_data[i].chips += remainder
                             break
 
+        # clear pots
+        self.pots = [Pot(0, {}, 0)]
         self.button_id = self.next_player(self.button_id, reverse=True)
         self.state = GameState.HAND_DONE
 
@@ -465,7 +506,7 @@ class Game:
 
     def in_hand_players(self, start=None, reverse=False, skip_start=False) -> Iterator[int]:
         ''''Wrapper for pl_iter excluding players not in the current hand'''
-        return self.pl_iter(start, reverse, exclude_states=(PlayerState.OUT,), skip_start=skip_start)
+        return self.pl_iter(start, reverse, exclude_states=[PlayerState.OUT], skip_start=skip_start)
 
     def not_folded_players(self, start=None, reverse=False, skip_start=False) -> Iterator[int]:
         '''Wrap pl_iter for players that have not folded'''
@@ -496,4 +537,8 @@ class Game:
             state=PlayerState.TO_CALL)
         )
         self._players.append(player)
-        self.history.players = len(self._players)
+
+    def __str__(self) -> str:
+        return f'(P{self.current_pl_id} to move, {self.community}, ' + \
+            f'{list(p.hand for p in self._players)}, {self.pots}, ' + \
+            f'{list(p.chips for p in self.pl_data)})'

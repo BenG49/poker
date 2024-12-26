@@ -6,6 +6,7 @@ import random
 from agents import bots
 from agents import boteval
 from agents.cfr import CFR, CFRBot, InfoSet
+from poker import phh
 from poker.game import Game
 
 CFR_GAME_CONFIG = {
@@ -44,4 +45,19 @@ def main():
     )
 
 if __name__ == '__main__':
-    main()
+    game = Game(1000, 20)
+    game.add_player(bots.HandValueBetter())
+    game.add_player(bots.Checker())
+    game.step_hand()
+    game.step_hand()
+    with open('out-1.phh', 'w', encoding='utf-8') as f:
+        f.write(phh.dump(game.history, 0))
+    with open('out-2.phh', 'w', encoding='utf-8') as f:
+        f.write(phh.dump(game.history, 1))
+
+    with open('out-2.phh', 'rb') as f:
+        loaded = phh.load(f)
+        print(loaded)
+        print()
+        for state in Game.replay(loaded):
+            print(state)

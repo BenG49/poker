@@ -6,7 +6,7 @@ from json import loads
 from random import choices
 import random
 from typing import Dict, List
-from poker.game import Game, GameState, Move, Player, PlayerState
+from poker.game import EmptyPlayer, Game, GameState, Move, Player, PlayerState
 from poker.util import Action, BettingStage, count
 
 
@@ -64,11 +64,6 @@ class CFRBot(Player):
             population=list(actions.keys()),
             weights=list(actions.values())
         )[0]
-
-class EmptyPlayer(Player):
-    '''Empty Player impl'''
-    def move(self, game: Game) -> Move:
-        ...
 
 HAND_DEAL = -1
 BOARD_DEAL = -2

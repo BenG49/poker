@@ -5,16 +5,11 @@ Stores and loads PHH file format.
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
-from pip._vendor.tomli import load
-
 from poker import hands
 from poker.hands import Hand
-from poker.util import Action, BettingStage, Card, count, reorder, same
+from poker.util import Action, BettingStage, Card, reorder
 
 Move = Tuple[Action, Optional[int]]
-
-class PHHParseError(ValueError):
-    '''Error parsing .phh file'''
 
 @dataclass
 class ActionEntry:
@@ -45,114 +40,6 @@ class ResultEntry:
 
 class GameHistory:
     '''Datastructure to store poker game history, works with Game from poker.game'''
-
-    @staticmethod
-    def import_phh(file: str) -> 'GameHistory':
-        '''
-        Construct GameHistory from .phh file.
-        Does not handle ?? for holecards.
-        '''
-        def parse_cardstr(s: str) -> List[Card]:
-            out = []
-            while len(s) > 0:
-                out.append(Card.new(s[:2]))
-                s = s[2:]
-            return out
-
-        with open(file, 'rb') as f:
-            data = load(f)
-
-        if data['variant'] != 'NT':
-            raise PHHParseError('Game variant not supported!')
-        if any(a != 0 for a in data['antes']):
-            raise PHHParseError('Nonzero antes not supported!')
-        if data['min_bet'] != 0:
-            raise PHHParseError('Nonzero min bet not supported!')
-
-        out = GameHistory(
-            small_blind=data['blinds_or_straddles'][0],
-            big_blind=data['blinds_or_straddles'][1]
-        )
-        out.hand_count = 1
-        out.cards.append([])
-        out.chips.append(data['starting_stacks'])
-        out.players = len(out.chips[0])
-        out._hands.append([None] * out.players)
-
-        # keep track of pots for results
-        fold_chips = [0]
-        pots = [{p: min(out.big_blind, out.chips[0][p]) for p in range(out.players)}]
-
-        stage_it = iter(BettingStage)
-        stage = next(stage_it)
-        for action in data['actions']:
-            actor, a_type, *args = action.split()
-
-            if actor == 'd':
-                if a_type == 'dh':
-                    out._hands[0][int(args[0][1])-1] = tuple(parse_cardstr(args[1]))
-                elif a_type == 'db':
-                    out.cards[0] += parse_cardstr(args[0])
-                    stage = next(stage_it)
-                else:
-                    raise PHHParseError('Invalid dealer action!')
-
-                continue
-
-            player = int(actor[1]) - 1
-            if a_type == 'cbr':
-                pots[-1][player] = max(pots[-1].values()) + int(args[0])
-
-                out.actions.append(ActionEntry(stage, player, (Action.RAISE, int(args[0]))))
-            elif a_type == 'cc':
-                pots[-1][player] = max(pots[-1].values())
-
-                out.actions.append(ActionEntry(stage, player, (Action.CALL, None)))
-            elif a_type == 'f':
-                # move chips to folded pot
-                for i, p in enumerate(pots):
-                    fold_chips[i] += p.pop(player, 0)
-
-                out.actions.append(ActionEntry(stage, player, (Action.FOLD, None)))
-
-        # split pot
-        while not same(pots[-1].values()):
-            max_bet = min(pots[-1].values())
-            pots.append({})
-            for pl, bet in pots[-2].items():
-                if bet > max_bet:
-                    pots[-2][pl] = max_bet
-                    pots[-1][pl] = bet - max_bet
-
-        out.end_hand()
-
-        # one person + folded chips remaining
-        if count(pots[0].keys()) == 1:
-            winner = next(pots[0].keys())
-            out.results[-1].append(ResultEntry(
-                sum(c + sum(p.values()) for c, p in zip(fold_chips, pots)),
-                [winner],
-                None
-            ))
-        # create rankings
-        else:
-            rankings = sorted([
-                (i, hands.evaluate([*out.cards[0], *out._hands[0][i]]))
-                for i in pots[0].keys()
-            ], key=lambda x: x[1])
-
-            for c, p in zip(fold_chips, pots):
-                pot_rankings = [r for r in rankings if r[0] in p.keys()]
-                winners = [p for p, h in pot_rankings if h == pot_rankings[0][1]]
-                out.results[-1].append(ResultEntry(
-                    c + sum(p.values()),
-                    winners,
-                    pot_rankings[0][1]
-                ))
-
-        return out
-
-
     def __init__(self, big_blind, small_blind):
         self.players = -1
         self.big_blind = big_blind
@@ -249,89 +136,6 @@ class GameHistory:
         for action in self.hand_actions(hand):
             lists[action.stage].append(action)
         return (lists.get(r) for r in iter(BettingStage))
-
-    ### FILE REPR ###
-
-    def export_phh(self, file: str, hand: int=0):
-        '''Export hand to .phh file'''
-        # TODO: add .phh extension, export to file-1, file-2 for hand 1, hand 2, if more than one hand
-
-        def action_str(action: ActionEntry) -> str:
-            if action.move[0] == Action.FOLD:
-                out = 'f'
-            elif action.move[0] == Action.CALL:
-                out = 'cc'
-            else:
-                out = f'cbr {action.move[1]}'
-            out = f'"p{action.player+1} {out}",'
-
-            if action.move[0] == Action.ALL_IN:
-                out += ' # All-in'
-            return out
-
-        # there are not enough hands to export requested hand
-        if self.hand_count < hand + 1:
-            open(file, 'wb').close()
-            return
-
-        with open(file, 'w', encoding="utf-8") as f:
-            f.write('variant = "NT"\n')
-            f.write(f'antes = {[0] * self.players}\n')
-            blinds = [self.small_blind, self.big_blind] + [0] * (self.players - 2)
-            f.write(f'blinds_or_straddles = {blinds}\n')
-            f.write('min_bet = 0\n')
-            f.write(f'starting_stacks = {self.chips[hand]}\n')
-            f.write(f'seats = {self.players}\n')
-            f.write(f'hand = {hand+1}\n')
-            f.write('actions = [\n')
-
-            board = self.cards[hand]
-            _, flop, turn, river = self.actions_by_stage(hand)
-
-            # showing holecards
-            folded = set(a.player for a in self.hand_actions(hand) if a.move[0] == Action.FOLD)
-            if len(folded) < self.players - 1:
-                showdown_stage = \
-                    BettingStage.PREFLOP if len(flop) == 0 else \
-                    BettingStage.FLOP if len(turn) == 0 else    \
-                    BettingStage.TURN if len(river) == 0 else   \
-                    BettingStage.RIVER
-                showdown_string = ''.join(
-                    f'  "p{i+1} sm {self._hands[hand][i][0]}{self._hands[hand][i][1]}",\n'
-                    for i in range(self.players)
-                    if i not in folded
-                )
-            else:
-                showdown_stage = None
-                showdown_string = ''
-
-            for r, actions in zip(iter(BettingStage), self.actions_by_stage(hand)):
-                if r == BettingStage.PREFLOP:
-                    f.write(f'  # {r.name}\n')
-                    # deal hands
-                    for i, hole in enumerate(self._hands[hand]):
-                        f.write(f'  "d dh p{i+1} {hole[0]}{hole[1]}",\n')
-                else:
-                    try:
-                        if r == BettingStage.FLOP:
-                            cards = (board[0], board[1], board[2])
-                        elif r == BettingStage.TURN:
-                            cards = (board[3],)
-                        elif r == BettingStage.RIVER:
-                            cards = (board[4],)
-                    except IndexError:
-                        break
-
-                    f.write(f'  # {r.name}\n')
-                    f.write(f'  "d db {''.join(str(c) for c in cards)}",\n')
-
-                for a in actions:
-                    f.write(f'  {action_str(a)}\n')
-
-                if showdown_stage == r:
-                    f.write(showdown_string)
-
-            f.write(']\n')
 
     def __str__(self) -> str:
         out = ''
