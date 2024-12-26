@@ -37,14 +37,14 @@ class PlayerState(Enum):
         return self in (PlayerState.TO_CALL, PlayerState.MOVED)
 
 class GameState(Enum):
+    '''Poker game state'''
     OVER = 0
     RUNNING = 1
     HAND_DONE = 2
 
-# previous round pots should not have any bets, just chips
-# to fold a player, their bet just goes into the pot and they are removed from every pot
 @dataclass
 class Pot:
+    '''Represent the pot or a split pot'''
     # chips in pot from previous betting stages
     chips: int
     # bets in pot from current round { pl_id: chips }
@@ -138,9 +138,10 @@ class Player(ABC):
 
     @abstractmethod
     def move(self, game) -> Move:
-        ...
+        '''Supply move given game state'''
 
     def chips(self, game) -> int:
+        '''Helper method to get chips for current player'''
         return game.pl_data[self.id].chips
 
 class EmptyPlayer(Player):
@@ -158,7 +159,7 @@ class Game:
 
         game = Game(0, history.big_blind, history.small_blind)
         for _ in range(history.players):
-            game.add_player(EmptyPlayer())
+            game.add_player()
 
         for h, actions in enumerate(history.actions_by_hand()):
             # init chips
@@ -411,18 +412,22 @@ class Game:
 
     @property
     def current_pl_data(self) -> PlayerData:
+        '''Getter for current player's data'''
         return self.pl_data[self.current_pl_id]
 
     @property
     def current_pl_pot(self) -> Pot:
+        '''Getter for the pot the current player is in'''
         return self.pots[self.current_pl_data.latest_pot]
 
     def chips_to_call(self, pl_id: int) -> int:
+        '''Helper for chips to call for player'''
         if self.pl_data[pl_id].state.active():
             return self.pots[self.pl_data[pl_id].latest_pot].chips_to_call(pl_id)
         return 0
 
     def running(self) -> bool:
+        '''Is game running?'''
         return self.state == GameState.RUNNING
 
     def betting_stage(self) -> BettingStage:
@@ -528,7 +533,7 @@ class Game:
 
     ### MODIFIERS ###
 
-    def add_player(self, player: Player):
+    def add_player(self, player: Player=EmptyPlayer()):
         '''Add player to game'''
         player.id = len(self._players)
         self.pl_data.append(PlayerData(

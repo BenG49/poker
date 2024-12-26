@@ -6,11 +6,6 @@ from typing import Callable, List, Tuple
 from poker.game import Game, Player
 from poker.util import count
 
-def set_cards_state(game, state):
-    game._players[0].hand, game._players[1].hand = state[0]
-    game.history._hands[0] = state[0]
-    game._deck.deck = state[1]
-
 def boteval(
         a_supplier: Callable[[], Player],
         b_supplier: Callable[[], Player],
@@ -37,7 +32,12 @@ def boteval(
         game.add_player(b_supplier())
         game.add_player(a_supplier())
         game.init_hand()
-        set_cards_state(game, state)
+
+        # set hand + deck state
+        game._players[0].hand, game._players[1].hand = state[0]
+        game.history._hands[0] = state[0]
+        game._deck.deck = state[1]
+
         while game.running():
             game.step_move()
         payoff += game.pl_data[1].chips - game.buy_in

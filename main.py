@@ -55,6 +55,7 @@ if __name__ == '__main__':
     with open('out-2.phh', 'w', encoding='utf-8') as f:
         f.write(phh.dump(game.history, 1))
 
+    # might open empty file if game ends after one hand
     with open('out-2.phh', 'rb') as f:
         loaded = phh.load(f)
         print(loaded)

@@ -41,6 +41,7 @@ class Action(Enum):
     FOLD = 3
 
     def to_str(self, amt: Optional[int]) -> str:
+        '''Action as string, meant to be concatednated to player name'''
         if self == Action.CALL:
             return 'called'
         if self == Action.RAISE:
@@ -51,6 +52,7 @@ class Action(Enum):
             return 'folded'
 
     def to_short_str(self, amt: Optional[int]) -> str:
+        '''Short string form (used in CFR)'''
         if self == Action.RAISE:
             return 'r' + str(amt)
 
@@ -61,6 +63,7 @@ class Action(Enum):
         }[self]
 
 class BettingStage(Enum):
+    '''Betting stages'''
     PREFLOP = 0
     FLOP = 1
     TURN = 2
@@ -113,6 +116,7 @@ class Rank(IntEnum):
         return '23456789TJQKA'[self.value]
 
     def prettyprint(self) -> str:
+        '''Card names'''
         return [
             'Two',
             'Three',
@@ -133,10 +137,13 @@ class Card:
     '''6 bits: 2 suit + 4 rank'''
 
     @staticmethod
-    def new(s: str) -> 'Card':
-        '''Create card from string, ex. Kh (king of hearts)'''
-        assert len(s) == 2
-        return Card(Rank.from_str(s[0]), Suit.from_str(s[1]))
+    def new(s: str) -> 'Card' | List['Card']:
+        '''Create card from string, ex. Kh (king of hearts), or multiple cards'''
+        assert len(s) % 2 == 0
+        if len(s) == 2:
+            return Card(Rank.from_str(s[0]), Suit.from_str(s[1]))
+
+        return [Card(Rank.from_str(s[i]), Suit.from_str(s[i+1])) for i in range(0, len(s), 2)]
 
     @staticmethod
     def from_int(i: int) -> 'Card':

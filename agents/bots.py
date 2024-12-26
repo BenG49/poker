@@ -50,7 +50,10 @@ class TerminalPlayer(Player):
     '''Terminal interface for human player'''
     def move(self, game: Game) -> Move:
         print('Your turn.')
-        print('Chips:', ', '.join(f'P{p}:(${game.pl_data[p].chips}, bet ${game.current_pl_pot.bets.get(p, 0)})' for p in game.pl_iter(skip_start=True)))
+        print('Chips:', ', '.join((
+            f'P{p}:(${game.pl_data[p].chips}, bet ${game.current_pl_pot.bets.get(p, 0)})'
+            for p in game.pl_iter(skip_start=True)
+        )))
         print('Community:', game.community)
         print('Your hand:', self.hand)
         print(f'Chips to call: ${game.chips_to_call(self.id)}')
@@ -72,8 +75,10 @@ class TerminalPlayer(Player):
         return action, int(amt)
 
 class EquityBot(Player):
+    '''Stupid bot that tries to bet based on expected value'''
     @staticmethod
     def equity(stage: BettingStage, hand: List[Card], community: List[Card]) -> float:
+        '''Calculate equity by brute forcing outs or calculating preflop hand value'''
         if stage == BettingStage.PREFLOP:
             def value(r: Rank) -> int:
                 return r + 3 if r == Rank.ACE else r + 2
@@ -104,6 +109,7 @@ class EquityBot(Player):
         return 2 * len(outs) / 100.0
 
     def pot_odds(self, game: Game) -> float:
+        '''Get current pot odds'''
         self_pot = game.pots[game.pl_data[self.id].latest_pot]
         total = self_pot.total() + self_pot.chips_to_call(self.id)
         return self_pot.chips_to_call(self.id) / total
@@ -118,12 +124,14 @@ class EquityBot(Player):
         return Action.CALL, None
 
 class PocketPairSeeker(Player):
-    def move(self, game: Game) -> Move:
+    '''All in on pocket pairs, fold otherwise'''
+    def move(self, _: Game) -> Move:
         if same(map(Card.get_rank, self.hand)):
             return Action.ALL_IN, None
         return Action.FOLD, None
 
 class HandValueBetter(Player):
+    '''Bets based on value of hand, with cutoff values for folding'''
     def move(self, game: Game) -> Move:
         '''[1, 14]'''
         def card_value(card: Card):

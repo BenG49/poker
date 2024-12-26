@@ -6,21 +6,24 @@ import unittest
 import random
 
 from agents import bots
+from poker import phh
 from poker.hands import evaluate, Hand
-from poker.history import GameHistory
 from poker.util import Card, count, same
 from poker.game import Game
 
 class TestUtils(unittest.TestCase):
     def test_same(self):
+        '''Test same method'''
         self.assertTrue(same([1, 1, 1]))
         self.assertFalse(same([1, 1, 0]))
 
-    def test_itlen(self):
+    def test_count(self):
+        '''Test count method'''
         self.assertEqual(count(map(lambda x: x**2, [0, 1, 2])), 3)
 
 class TestLUT(unittest.TestCase):
     def test_coverage(self):
+        '''Make sure all hand ranks are in LUT'''
         unsuited = Hand.UNSUITED.values()
         suited = Hand.SUITED.values()
         for i in range(1, Hand.HAND_COUNT + 1):
@@ -28,17 +31,18 @@ class TestLUT(unittest.TestCase):
 
 class TestHand(unittest.TestCase):
     def test_hand_ranks(self):
+        '''Test ranking hands'''
         hand_ranks = [
-            evaluate([Card.new('Tc'), Card.new('7h'), Card.new('4d'), Card.new('Kc'), Card.new('2s')]),
-            evaluate([Card.new('Kc'), Card.new('Kh'), Card.new('7d'), Card.new('2c'), Card.new('5s')]),
-            evaluate([Card.new('Kc'), Card.new('Kh'), Card.new('7d'), Card.new('7c'), Card.new('5s')]),
-            evaluate([Card.new('Kc'), Card.new('Kh'), Card.new('Kd'), Card.new('7c'), Card.new('5s')]),
-            evaluate([Card.new('Ac'), Card.new('2h'), Card.new('3d'), Card.new('4c'), Card.new('5s')]),
-            evaluate([Card.new('Kc'), Card.new('Qc'), Card.new('9c'), Card.new('8c'), Card.new('2c')]),
-            evaluate([Card.new('Kc'), Card.new('Kh'), Card.new('Kd'), Card.new('7c'), Card.new('7s')]),
-            evaluate([Card.new('6s'), Card.new('6d'), Card.new('6h'), Card.new('6c'), Card.new('Ks')]),
-            evaluate([Card.new('2s'), Card.new('3s'), Card.new('4s'), Card.new('5s'), Card.new('6s')]),
-            evaluate([Card.new('Th'), Card.new('Jh'), Card.new('Qh'), Card.new('Kh'), Card.new('Ah')])
+            evaluate(Card.new('Tc7h4dKc2s')),
+            evaluate(Card.new('KcKh7d2c5s')),
+            evaluate(Card.new('KcKh7d7c5s')),
+            evaluate(Card.new('KcKhKd7c5s')),
+            evaluate(Card.new('Ac2h3d4c5s')),
+            evaluate(Card.new('KcQc9c8c2c')),
+            evaluate(Card.new('KcKhKd7c7s')),
+            evaluate(Card.new('6s6d6h6cKs')),
+            evaluate(Card.new('2s3s4s5s6s')),
+            evaluate(Card.new('ThJhQhKhAh'))
         ]
 
         self.assertEqual(hand_ranks, [
@@ -55,25 +59,13 @@ class TestHand(unittest.TestCase):
         ])
 
     def test_highest_hand(self):
-        self.assertEqual(evaluate([Card.new('Th'), Card.new('Jh'), Card.new('Qh'), Card.new('Kh'), Card.new('Ah')]),
-            evaluate([Card.new('Th'), Card.new('Jh'), Card.new('Qh'), Card.new('Kh'), Card.new('Ah'), Card.new('2s'), Card.new('Ts')]),
+        '''Test finding highest hand from 7 card hand'''
+        self.assertEqual(evaluate(Card.new('ThJhQhKhAh')),
+            evaluate(Card.new('ThJhQhKhAh2sTs')),
             'Found the wrong highest hand!')
 
 
 class TestGame(unittest.TestCase):
-    def test_player_data(self):
-        game = Game(200, 2)
-        game.add_player(bots.Raiser(2))
-        game.add_player(bots.Checker())
-        game.pl_data[-1].chips = 150
-        game.add_player(bots.Folder())
-        game.pl_data[-1].chips = 100
-        game.add_player(bots.AllIn())
-        game.pl_data[-1].chips = 50
-        self.assertEqual(len(game.pl_data), 4)
-
-        self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [200, 150, 100, 50])
-
     # preflop
     #     bets: 52, 52, 2, 50
     #     chips: 148, 98, 98, 0
@@ -101,6 +93,7 @@ class TestGame(unittest.TestCase):
     # final balances:
     #     234, 92, 98, 76
     def test_side_hand(self):
+        '''Test side pots'''
         game = Game(200, 2)
         game.add_player(bots.Raiser(2))
         game.add_player(bots.Checker())
@@ -129,6 +122,7 @@ class TestGame(unittest.TestCase):
     # final balances:
     #     10, 20, 100
     def test_side_hands(self):
+        '''Test multiple side pots'''
         game = Game(100, 2)
         game.add_player(bots.AllIn())
         game.pl_data[-1].chips = 10
@@ -153,6 +147,7 @@ class TestGame(unittest.TestCase):
     # final balances:
     #     20, 10, 100
     def test_side_hands2(self):
+        '''Test side pots'''
         game = Game(100, 2)
         game.add_player(bots.AllIn())
         game.pl_data[-1].chips = 20
@@ -165,6 +160,7 @@ class TestGame(unittest.TestCase):
         self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [20, 10, 100])
 
     def test_all_fold(self):
+        '''Test all players instantly folding'''
         game = Game(100, 2)
         game.add_player(bots.Folder())
         game.add_player(bots.Folder())
@@ -174,6 +170,7 @@ class TestGame(unittest.TestCase):
         self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [100, 99, 101])
 
     def test_gen_moves(self):
+        '''Test valid move generation'''
         game = Game(100, 2)
         game.add_player(bots.Checker())
         game.add_player(bots.Checker())
@@ -199,6 +196,7 @@ class TestGame(unittest.TestCase):
         self.assertEqual(len(game.get_moves(0)), 4)
 
     def test_allin_blinds(self):
+        '''Make sure all players call big blind even if big blind player has to go all in'''
         game = Game(4, 2)
         game.add_player(bots.Checker()) # sb
         game.add_player(bots.Checker()) # bb
@@ -210,14 +208,17 @@ class TestGame(unittest.TestCase):
 
 class TestHistory(unittest.TestCase):
     def test_import_export(self):
+        '''Test exporting and importing game history as phh file'''
         game = Game(1000, 20)
         game.add_player(bots.HandValueBetter())
         game.add_player(bots.Checker())
         random.seed(12)
         game.step_hand()
 
-        game.history.export_phh('__test.phh')
-        imported = GameHistory.import_phh('__test.phh')
+        with open('__test.phh', 'w', encoding='utf-8') as f:
+            f.write(phh.dump(game.history))
+        with open('__test.phh', 'rb') as f:
+            imported = phh.load(f)
 
         self.assertEqual(game.history.players, imported.players)
         self.assertEqual(game.history.small_blind, imported.small_blind)

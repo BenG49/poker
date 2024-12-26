@@ -21,9 +21,11 @@ class HandType(IntEnum):
     ROYAL_FLUSH = 9
 
     def is_flush(self) -> bool:
+        '''If hand type is a flush'''
         return self in (HandType.FLUSH, HandType.STR_FLUSH, HandType.ROYAL_FLUSH)
 
     def to_str(self) -> str:
+        '''String hand description'''
         return [
             'High Card',
             'Pair',
@@ -136,7 +138,8 @@ class Hand(int):
                         continue
 
                     unsuited[key(a, a, a, b, c)] = n + Hand.TRIPS_BEST
-                    strings[n + Hand.TRIPS_BEST] = f'{a.to_str()} Three of a Kind ({b.to_str()} High)'
+                    strings[n + Hand.TRIPS_BEST] = \
+                        f'{a.to_str()} Three of a Kind ({b.to_str()} High)'
                     n -= 1
 
         # two pair

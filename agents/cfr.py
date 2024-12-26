@@ -6,7 +6,7 @@ from json import loads
 from random import choices
 import random
 from typing import Dict, List
-from poker.game import EmptyPlayer, Game, GameState, Move, Player, PlayerState
+from poker.game import Game, GameState, Move, Player, PlayerState
 from poker.util import Action, BettingStage, count
 
 
@@ -81,7 +81,7 @@ class History:
         self.game = Game(**game_settings)
         # add players
         for _ in range(players):
-            self.game.add_player(EmptyPlayer())
+            self.game.add_player()
 
     def is_done(self) -> bool:
         '''Ends game after one round'''
@@ -123,7 +123,11 @@ class History:
     ### INFO SETS ###
     def current_pl_info_set_key(self) -> str:
         '''Generate key for the info set at the current node in the game tree'''
-        return make_infoset_key(self.game._players[self.game.current_pl_id].hand, self.game.community, self.bet_history)
+        return make_infoset_key(
+            self.game._players[self.game.current_pl_id].hand,
+            self.game.community,
+            self.bet_history
+        )
 
     def current_pl_new_info_set(self) -> 'InfoSet':
         '''Return infoset for current history state'''
@@ -311,11 +315,11 @@ class CFR:
                     f.write(str(infoset))
                     f.write('\n')
 
-
     # TODO: test subset:
     #       - limit card possibilities
     #       - limit possible bets
     def run(self, iterations: int):
+        '''Run 2 player cfr for set number of iterations, accumulate infosets'''
         for t in range(iterations):
             for p in range(self.players):
                 self.step_tree(History(self.players, self.game_settings), p, 1, 1)

@@ -3,7 +3,7 @@ Functions for reading from and exporting to .phh format.
 All really messy, should be cleaned up.
 '''
 
-from typing import BinaryIO, List
+from typing import BinaryIO
 
 from pip._vendor import tomli
 
@@ -19,13 +19,6 @@ def load(file: BinaryIO) -> GameHistory:
     Construct GameHistory from .phh file.
     Does not handle ?? for holecards.
     '''
-    def parse_cardstr(s: str) -> List[Card]:
-        out = []
-        while len(s) > 0:
-            out.append(Card.new(s[:2]))
-            s = s[2:]
-        return out
-
     data = tomli.load(file)
 
     if data['variant'] != 'NT':
@@ -56,9 +49,10 @@ def load(file: BinaryIO) -> GameHistory:
 
         if actor == 'd':
             if a_type == 'dh':
-                out._hands[0][int(args[0][1])-1] = tuple(parse_cardstr(args[1]))
+                out._hands[0][int(args[0][1])-1] = tuple(Card.new(args[1]))
             elif a_type == 'db':
-                out.cards[0] += parse_cardstr(args[0])
+                card = Card.new(args[0])
+                out.cards[0].extend([card] if isinstance(card, Card) else card)
                 stage = next(stage_it)
             else:
                 raise PHHParseError('Invalid dealer action!')
