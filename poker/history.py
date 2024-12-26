@@ -5,9 +5,9 @@ Stores and loads PHH file format.
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
-from poker import hands
-from poker.hands import Hand
-from poker.util import Action, BettingStage, Card, reorder
+from . import hands
+from .hands import Hand
+from .util import Action, BettingStage, Card, reorder
 
 Move = Tuple[Action, Optional[int]]
 

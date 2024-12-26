@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Iterator, List, Dict, Tuple, Optional, Self
 
-from poker import hands
+from . import hands
 from .history import GameHistory
 from .util import Action, BettingStage, Card, Deck, count, same
 

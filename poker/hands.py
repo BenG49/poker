@@ -5,7 +5,7 @@ from enum import IntEnum
 from itertools import combinations
 from typing import List
 
-from poker.util import Card, Rank, same
+from .util import Card, Rank, same
 
 class HandType(IntEnum):
     '''Ranked categories of poker hands'''
