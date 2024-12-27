@@ -8,10 +8,12 @@ from agents import boteval
 from agents.cfr import CFR, CFRBot, InfoSet
 from poker import phh
 from poker.game import Game
+from poker.util import Action
 
 CFR_GAME_CONFIG = {
     'buy_in': 2,
-    'big_blind': 1
+    'big_blind': 1,
+    'small_blind': 0
 }
 
 def train_cfr():
@@ -29,7 +31,7 @@ def run_cfr_from_file():
     print(game.history)
     print(game.history.cards)
 
-def main():
+def tournament():
     boteval.run_tournament(
         {'buy_in': 1000, 'big_blind': 20},
         2_000,
@@ -44,8 +46,8 @@ def main():
         ]
     )
 
-if __name__ == '__main__':
-    game = Game(1000, 20)
+def run_phh():
+    game = Game(1000, 20, 10)
     game.add_player(bots.HandValueBetter())
     game.add_player(bots.Checker())
     game.step_hand()
@@ -62,3 +64,17 @@ if __name__ == '__main__':
         print()
         for state in Game.replay(loaded):
             print(state)
+
+def limit_game():
+    game = Game(1000, 20, 10, 40, 20)
+    game.add_player()
+    game.add_player()
+    game.init_hand()
+    game.accept_move(Action.RAISE)
+    game.accept_move(Action.RAISE)
+    game.accept_move(Action.CALL)
+    game.accept_move(Action.FOLD)
+    print(game.history)
+
+if __name__ == '__main__':
+    limit_game()

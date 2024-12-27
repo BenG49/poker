@@ -8,7 +8,7 @@ import random
 from agents import bots
 from poker import phh
 from poker.hands import evaluate, Hand
-from poker.util import Card, count, same
+from poker.util import Action, Card, count, same
 from poker.game import Game
 
 class TestUtils(unittest.TestCase):
@@ -94,7 +94,7 @@ class TestGame(unittest.TestCase):
     #     234, 92, 98, 76
     def test_side_hand(self):
         '''Test side pots'''
-        game = Game(200, 2)
+        game = Game(200, 2, 1)
         game.add_player(bots.Raiser(2))
         game.add_player(bots.Checker())
         game.pl_data[-1].chips = 150
@@ -123,7 +123,7 @@ class TestGame(unittest.TestCase):
     #     10, 20, 100
     def test_side_hands(self):
         '''Test multiple side pots'''
-        game = Game(100, 2)
+        game = Game(100, 2, 1)
         game.add_player(bots.AllIn())
         game.pl_data[-1].chips = 10
         game.add_player(bots.AllIn())
@@ -148,7 +148,7 @@ class TestGame(unittest.TestCase):
     #     20, 10, 100
     def test_side_hands2(self):
         '''Test side pots'''
-        game = Game(100, 2)
+        game = Game(100, 2, 1)
         game.add_player(bots.AllIn())
         game.pl_data[-1].chips = 20
         game.add_player(bots.AllIn())
@@ -161,7 +161,7 @@ class TestGame(unittest.TestCase):
 
     def test_all_fold(self):
         '''Test all players instantly folding'''
-        game = Game(100, 2)
+        game = Game(100, 2, 1)
         game.add_player(bots.Folder())
         game.add_player(bots.Folder())
         game.add_player(bots.Folder())
@@ -169,35 +169,145 @@ class TestGame(unittest.TestCase):
 
         self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [100, 99, 101])
 
-    def test_gen_moves(self):
-        '''Test valid move generation'''
-        game = Game(100, 2)
-        game.add_player(bots.Checker())
-        game.add_player(bots.Checker())
+    def test_gen_nl_moves(self):
+        '''Test move generation for No-limit Holdem games'''
+        game = Game(10, 2, 1)
+        game.add_player()
+        game.add_player()
         game.init_hand()
-        self.assertEqual(len(game.get_moves(0)), 100)
+        self.assertEqual(game.get_moves(0), [
+            (Action.FOLD, None),
+            (Action.CALL, None),   # 1 chip
+            (Action.RAISE, 1),     # 2 chips
+            (Action.RAISE, 2),     # 3 chips
+            (Action.RAISE, 3),     # 4 chips
+            (Action.RAISE, 4),     # 5 chips
+            (Action.RAISE, 5),     # 6 chips
+            (Action.RAISE, 6),     # 7 chips
+            (Action.RAISE, 7),     # 8 chips
+            (Action.ALL_IN, None), # 9 chips
+        ])
 
-        game = Game(2, 2)
-        game.add_player(bots.Checker())
-        game.add_player(bots.Checker())
+        game = Game(2, 2, 1)
+        game.add_player()
+        game.add_player()
         game.init_hand()
-        self.assertEqual(len(game.get_moves(0)), 2)
+        self.assertEqual(game.get_moves(0), [
+            (Action.FOLD, None),
+            (Action.CALL, None), # 1 chip
+        ])
 
-        game = Game(3, 2)
-        game.add_player(bots.Checker())
-        game.add_player(bots.Checker())
+        game = Game(3, 2, 1)
+        game.add_player()
+        game.add_player()
         game.init_hand()
-        self.assertEqual(len(game.get_moves(0)), 3)
+        self.assertEqual(game.get_moves(0), [
+            (Action.FOLD, None),
+            (Action.CALL, None),   # 1 chip
+            (Action.ALL_IN, None), # 2 chips
+        ])
 
-        game = Game(4, 2)
-        game.add_player(bots.Checker())
-        game.add_player(bots.Checker())
+        game = Game(4, 2, 1)
+        game.add_player()
+        game.add_player()
         game.init_hand()
-        self.assertEqual(len(game.get_moves(0)), 4)
+        self.assertEqual(game.get_moves(0), [
+            (Action.FOLD, None),
+            (Action.CALL, None),   # 1 chip
+            (Action.RAISE, 1),     # 2 chips
+            (Action.ALL_IN, None), # 3 chips
+        ])
+
+        game = Game(6, 2, 1)
+        game.add_player()
+        game.pl_data[-1].chips = 10
+        game.add_player()
+        game.init_hand()
+        game.accept_move(Action.ALL_IN)
+        self.assertEqual(game.get_moves(1), [
+            (Action.FOLD, None),
+            (Action.ALL_IN, None),
+        ])
+
+    def test_gen_fl_moves(self):
+        '''Test move generation for Fixed-limit Holdem games'''
+        game = Game(8, 0, 0, big_bet=8, small_bet=4)
+        game.add_player()
+        game.add_player()
+        game.init_hand()
+        self.assertEqual(game.get_moves(0), [
+            (Action.FOLD, None),
+            (Action.CALL, None),
+            (Action.RAISE, 4)
+        ])
+
+        # all in == fixed limit raise
+        game = Game(8, 0, 0, big_bet=8, small_bet=4)
+        game.add_player()
+        game.add_player()
+        game.init_hand()
+        game.accept_move(Action.RAISE, 4)
+        self.assertEqual(game.get_moves(1), [
+            (Action.FOLD, None),
+            (Action.CALL, None),  # 4 chips
+            (Action.ALL_IN, None) # 8 chips
+        ])
+
+        # all in == fixed limit raise
+        game = Game(8, 0, 0, big_bet=8, small_bet=4)
+        game.add_player()
+        game.add_player()
+        game.init_hand()
+        game.accept_move(Action.RAISE, 4)
+        self.assertEqual(game.get_moves(1), [
+            (Action.FOLD, None),
+            (Action.CALL, None),  # 4 chips
+            (Action.ALL_IN, None) # 8 chips
+        ])
+
+        # lots of all ins
+        game = Game(4, 0, 0, big_bet=8, small_bet=4)
+        game.add_player()
+        game.add_player()
+        game.init_hand()
+        game.accept_move(Action.ALL_IN)
+        self.assertEqual(game.get_moves(1), [
+            (Action.FOLD, None),
+            (Action.CALL, None),
+        ])
+
+        # complete all in
+        game = Game(8, 0, 0, big_bet=8, small_bet=4)
+        game.add_player()
+        game.pl_data[0].chips = 2
+        game.add_player()
+        game.init_hand()
+        game.accept_move(Action.ALL_IN)
+        self.assertEqual(game.get_moves(1), [
+            (Action.FOLD, None),
+            (Action.CALL, None), # 2 chips
+            (Action.RAISE, 4)    # 6 chips
+        ])
+
+        # raise limits
+        game = Game(8, 0, 0, big_bet=2, small_bet=1)
+        game.add_player()
+        game.add_player()
+        game.add_player()
+        game.init_hand()
+        game.accept_move(Action.RAISE, 1) # P0
+        game.accept_move(Action.RAISE, 1) # P1
+        game.accept_move(Action.RAISE, 1) # P2
+        game.accept_move(Action.RAISE, 1) # P0
+        game.accept_move(Action.RAISE, 1) # P1
+        self.assertEqual(game.get_moves(2), [
+            (Action.FOLD, None),
+            (Action.CALL, None),
+        ])
 
     def test_allin_blinds(self):
         '''Make sure all players call big blind even if big blind player has to go all in'''
-        game = Game(4, 2)
+        game = Game(4, 2, 1)
         game.add_player(bots.Checker()) # sb
         game.add_player(bots.Checker()) # bb
         game.pl_data[-1].chips = 1
@@ -206,10 +316,31 @@ class TestGame(unittest.TestCase):
         self.assertEqual(game.pl_data[0].chips, 2)
         self.assertEqual(game.pl_data[1].chips, 0)
 
+    def test_uneven_split(self):
+        '''Test distributing odd chips'''
+        # p1 puts one chip in and folds
+        # p0 and p2 put two chips in and tie, odd chip
+        game = Game(2, 0, 0)
+        game.add_player()
+        game.add_player()
+        game.add_player()
+        random.seed(12)   # all players tie
+        game.init_hand()
+        game.accept_move(Action.RAISE, 1)
+        game.accept_move(Action.CALL)
+        game.accept_move(Action.CALL)
+        # flop
+        game.accept_move(Action.ALL_IN)
+        game.accept_move(Action.FOLD)
+        game.accept_move(Action.CALL)
+
+        # button is 0, first player after button is 1
+        self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [2, 1, 3])
+
 class TestHistory(unittest.TestCase):
     def test_import_export(self):
         '''Test exporting and importing game history as phh file'''
-        game = Game(1000, 20)
+        game = Game(1000, 20, 10)
         game.add_player(bots.HandValueBetter())
         game.add_player(bots.Checker())
         random.seed(12)

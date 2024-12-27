@@ -15,6 +15,7 @@ class PHHParseError(ValueError):
     '''Error parsing .phh file'''
 
 def load(file: BinaryIO) -> GameHistory:
+    # pylint: disable=protected-access
     '''
     Construct GameHistory from .phh file.
     Does not handle ?? for holecards.
@@ -113,6 +114,7 @@ def load(file: BinaryIO) -> GameHistory:
     return out
 
 def dump(history: GameHistory, hand: int=0) -> str:
+    # pylint: disable=protected-access
     '''Dump one hand's history to .phh file format'''
 
     # there are not enough hands to export requested hand

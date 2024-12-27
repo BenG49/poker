@@ -3,9 +3,12 @@ Utility classes Suit, Rank, Card, Hand
 '''
 from copy import copy
 from enum import Enum, IntEnum
+from functools import wraps
 from math import prod
 from random import shuffle
-from typing import Callable, List, Iterable, Optional
+from typing import Callable, List, Iterable, Optional, Tuple, Type, TypeVar
+
+T = TypeVar('T')
 
 def same(it: Iterable) -> bool:
     '''True if all items in iterable are equal'''
@@ -27,6 +30,24 @@ def reorder(idx_to_idx: Callable[[int], int], l: List):
         out[idx_to_idx(i)] = item
     return out
 
+def check_throw(exception_t: Type[Exception]):
+    '''
+    Decorator that turns a function that returns a bool and message into
+    a function that returns a bool and optionally throws an error.
+    From Evyn Machi
+    '''
+    def decorator(f: Callable[[T], Tuple[bool, str]]) -> Callable[[T], bool]:
+        @wraps(f)
+        def inner(*args, throws=False, **kwargs):
+            check, msg = f(*args, **kwargs)
+            if not check and throws:
+                raise exception_t(msg)
+            return check
+
+        return inner
+
+    return decorator
+
 class Action(Enum):
     '''
     Actions that a player can take:
@@ -34,6 +55,10 @@ class Action(Enum):
     RAISE:  raise by amt MORE THAN current bet
     ALL_IN: post all of player's chips
     FOLD:   fold
+
+    Precedence for identical moves:
+    - CALL over ALL_IN
+    - ALL_IN over RAISE
     '''
     CALL = 0
     RAISE = 1

@@ -8,7 +8,7 @@ from typing import Iterator, List, Dict, Tuple, Optional, Self
 
 from . import hands
 from .history import GameHistory
-from .util import Action, BettingStage, Card, Deck, count, same
+from .util import Action, BettingStage, Card, Deck, check_throw, count, same
 
 Move = Tuple[Action, Optional[int]]
 
@@ -154,6 +154,7 @@ class Game:
 
     @staticmethod
     def replay(history: GameHistory, hand: int=0) -> Iterator['Game']:
+        # pylint: disable=protected-access
         '''Replays game history with an iterator through each game state'''
         # NOTE: does not yield state between last move and showdown
 
@@ -185,11 +186,13 @@ class Game:
 
                 yield game
 
-    def __init__(self, buy_in: int, big_blind: int, small_blind: int=None):
+    def __init__(self, buy_in, big_blind, small_blind, big_bet=0, small_bet=0):
         # constants
         self.buy_in: int = buy_in
         self.big_blind: int = big_blind
-        self.small_blind: int = big_blind // 2 if small_blind is None else small_blind
+        self.small_blind: int = small_blind
+        self.big_bet: int = big_bet
+        self.small_bet: int = small_bet
 
         # game state
         self.state: GameState = GameState.HAND_DONE
@@ -198,6 +201,9 @@ class Game:
         self.bb_id: int = -1
         self.button_id: int = 0
         self.current_pl_id: int = -1
+
+        # remaining raises allowed for current betting stage if fixed limit
+        self.raises_left: int = -1
 
         self.pl_data: List[PlayerData] = []
         self.community: List[Card] = []
@@ -210,8 +216,6 @@ class Game:
         self._deck: Deck = Deck()
 
     def __bet(self, pl_id: int, chips: int):
-        if self.pl_data[pl_id].chips < chips:
-            raise InvalidMoveError('Cannot put in more chips than available!')
         self.pl_data[pl_id].chips -= chips
         self.pots[self.pl_data[pl_id].latest_pot].add(pl_id, chips)
 
@@ -264,6 +268,9 @@ class Game:
         # no matter what, rest of players have to match big blind raise
         self.pots[-1].total_raised = self.big_blind
 
+        # reset number of raises allowed this round
+        self.raises_left = 5
+
         self.current_pl_id = self.next_player(self.bb_id)
 
     def step_move(self):
@@ -273,40 +280,30 @@ class Game:
     def accept_move(self, action: Action, amt: int=None):
         '''Accept move, handle resulting game state'''
         if self.current_pl_data.state.active():
-            if amt is not None and amt < 0:
-                raise InvalidMoveError('Negative bet supplied!')
+            self.validate_move(self.current_pl_id, action, amt, throws=True)
 
-            if action == Action.RAISE:
-                if amt + self.chips_to_call(self.current_pl_id) == self.current_pl_data.chips:
-                    action = Action.ALL_IN
-                elif amt == 0:
-                    action = Action.CALL
-                    amt = None
+            action, amt = self.translate_move(self.current_pl_id, action, amt)
 
-            if action == Action.ALL_IN:
-                amt = self.current_pl_data.chips
-
-            self.history.add_action(self.betting_stage(), self.current_pl_id, (action, amt))
             bet = None
-
-            if action == Action.FOLD:
-                self.current_pl_pot.fold(self.current_pl_id)
-                self.current_pl_data.state = PlayerState.FOLDED
-
-            elif action == Action.CALL:
-                bet = min(
-                    self.chips_to_call(self.current_pl_id),
-                    self.current_pl_data.chips
-                )
-                self.current_pl_data.state = PlayerState.MOVED
-
-            elif action == Action.RAISE:
-                bet = amt + self.chips_to_call(self.current_pl_id)
-                self.current_pl_data.state = PlayerState.MOVED
-
-            elif action == Action.ALL_IN:
-                bet = self.current_pl_data.chips
-                self.current_pl_data.state = PlayerState.ALL_IN
+            match action:
+                case Action.FOLD:
+                    self.current_pl_pot.fold(self.current_pl_id)
+                    self.current_pl_data.state = PlayerState.FOLDED
+                case Action.CALL:
+                    bet = min(
+                        self.chips_to_call(self.current_pl_id),
+                        self.current_pl_data.chips
+                    )
+                    self.current_pl_data.state = PlayerState.MOVED
+                case Action.RAISE:
+                    bet = amt + self.chips_to_call(self.current_pl_id)
+                    self.current_pl_data.state = PlayerState.MOVED
+                    self.raises_left -= 1
+                case Action.ALL_IN:
+                    bet = self.current_pl_data.chips
+                    self.current_pl_data.state = PlayerState.ALL_IN
+                    if bet < self.get_current_limit() / 2:
+                        self.raises_left -= 1
 
             if bet is not None:
                 if bet > self.chips_to_call(self.current_pl_id):
@@ -317,6 +314,8 @@ class Game:
                         if pl.state == PlayerState.MOVED:
                             pl.state = PlayerState.TO_CALL
                 self.__bet(self.current_pl_id, bet)
+
+            self.history.add_action(self.betting_stage(), self.current_pl_id, (action, amt))
 
         self.current_pl_id = self.next_player()
 
@@ -345,13 +344,16 @@ class Game:
 
         self.current_pl_id = self.next_player(self.bb_id)
 
+        # reset number of raises allowed this round
+        self.raises_left = 5
+
         # check if only one player remaining or showdown
         if count(self.pl_iter(include_states=(PlayerState.MOVED, PlayerState.TO_CALL))) < 2 or \
            self.betting_stage() == BettingStage.RIVER:
             self.end_hand()
 
         # deal next round
-        elif self.betting_stage() != BettingStage.RIVER:
+        else:
             ncards = 3 if self.betting_stage() == BettingStage.PREFLOP else 1
             self.community += self.history.deal(self._deck.deal(ncards))
 
@@ -430,6 +432,10 @@ class Game:
         '''Is game running?'''
         return self.state == GameState.RUNNING
 
+    def is_limit(self) -> bool:
+        '''Is game fixed-limit?'''
+        return self.small_bet > 0 and self.big_bet > 0
+
     def betting_stage(self) -> BettingStage:
         '''What the current betting stage is'''
         return {
@@ -438,6 +444,12 @@ class Game:
             4: BettingStage.TURN,
             5: BettingStage.RIVER
         }[len(self.community)]
+
+    def get_current_limit(self) -> int:
+        '''Get fixed limit for current betting round'''
+        if self.betting_stage() in (BettingStage.PREFLOP, BettingStage.FLOP):
+            return self.small_bet
+        return self.big_bet
 
     def raise_to(self, pl_id: int, raise_to: int) -> Optional[int]:
         '''Convert from raising to the overall pot raise TO raising from the current bet.'''
@@ -454,13 +466,87 @@ class Game:
         out = [(Action.FOLD, None)]
 
         free_chips = self.pl_data[pl_id].chips - self.chips_to_call(pl_id)
-        if free_chips >= 0:
+        if free_chips < 0:
+            out.append((Action.ALL_IN, None))
+        elif free_chips == 0:
             out.append((Action.CALL, None))
-            if free_chips > 0:
-                out.append((Action.ALL_IN, None))
+        else:
+            out.append((Action.CALL, None))
+            if self.is_limit():
+                raise_amt = self.get_current_limit()
+                # raise to complete limit if current raise is small
+                if self.chips_to_call(pl_id) < self.get_current_limit() / 2:
+                    raise_amt -= self.chips_to_call(pl_id)
+
+                # if raise allowed
+                if len(self._players) == 2 or self.raises_left > 0:
+                    if free_chips <= raise_amt:
+                        out.append((Action.ALL_IN, None))
+                    else:
+                        out.append((Action.RAISE, raise_amt))
+
+                # all-in that doesn't count as a raise
+                elif free_chips < self.get_current_limit() / 2:
+                    out.append((Action.ALL_IN, None))
+            else:
+                # no-limit
                 out.extend([(Action.RAISE, i) for i in range(1, free_chips)])
+                out.append((Action.ALL_IN, None))
 
         return out
+
+    def translate_move(self, pl_id: int, action: Action, amt: int) -> Move:
+        '''Translate move into standard move format'''
+        if action == Action.RAISE:
+            if amt is None and self.is_limit():
+                amt = self.get_current_limit()
+                # raise to complete limit if current raise is small
+                if self.chips_to_call(pl_id) < self.get_current_limit() / 2:
+                    amt -= self.chips_to_call(pl_id)
+            if amt + self.chips_to_call(pl_id) == self.pl_data[pl_id].chips:
+                action = Action.ALL_IN
+            elif amt == 0:
+                action = Action.CALL
+                amt = None
+
+        if action == Action.ALL_IN:
+            amt = self.pl_data[pl_id].chips
+
+        return action, amt
+
+    @check_throw(InvalidMoveError)
+    def validate_move(self, pl_id: int, action: Action, amt: int=None, throws: bool=False) -> bool:
+        # pylint: disable=unused-argument, too-many-return-statements
+        '''Validate move, throw InvalidMoveError if throws is True and move is invalid'''
+        action, amt = self.translate_move(pl_id, action, amt)
+        if amt is not None and amt < 0:
+            return False, 'Positive value is required for amt.'
+
+        if self.pl_data[pl_id].state != PlayerState.TO_CALL:
+            return False, f'Player {pl_id} has state {self.pl_data[pl_id].state.name}, cannot move.'
+
+        at_bet_limit = self.is_limit() and len(self._players) > 2 and self.raises_left <= 0
+        if (action == Action.RAISE or
+               (action == Action.ALL_IN and amt >= self.get_current_limit() / 2)) and \
+           at_bet_limit:
+            return False, 'Cannot raise more than 5 times per round.'
+
+        chips = self.pl_data[pl_id].chips
+        to_call = self.chips_to_call(pl_id)
+
+        if action == Action.CALL and chips < to_call:
+            return False, f'Cannot call {to_call} chips, more than available {chips} chips'
+
+        if action == Action.RAISE:
+            if amt is None or amt < 0:
+                return False, 'Expected positive value for move RAISE.'
+
+            if chips < to_call + amt:
+                return False, (f'Cannot raise by {to_call + amt} chips,'
+                                'more than available {chips} chips')
+
+        return True, ''
+
 
     def next_player(self, pl_id: int=None, reverse: bool=False) -> int:
         '''Next in hand player after pl_id'''
@@ -530,6 +616,8 @@ class Game:
         self._players.append(player)
 
     def __str__(self) -> str:
-        return f'(P{self.current_pl_id} to move, {self.community}, ' + \
-            f'{list(p.hand for p in self._players)}, {self.pots}, ' + \
+        return (
+            f'(P{self.current_pl_id} to move, {self.community}, '
+            f'{list(p.hand for p in self._players)}, {self.pots}, '
             f'{list(p.chips for p in self.pl_data)})'
+        )

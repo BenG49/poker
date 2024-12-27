@@ -12,6 +12,7 @@ def boteval(
         game_supplier: Callable[[], Game],
         rounds: int
     ) -> float:
+    # pylint: disable=protected-access
     '''
     Evalulates two bots, returns mbb/g for player a (-mbb/g for player b).
     Runs flipped copies of each deal iterations/2 times.

@@ -219,7 +219,6 @@ def get_type(hand: Hand) -> HandType:
         return HandType.ROYAL_FLUSH
 
     for t, best in enumerate([
-        Hand.HIGH_BEST,
         Hand.PAIR_BEST,
         Hand.TPAIR_BEST,
         Hand.TRIPS_BEST,
@@ -231,6 +230,8 @@ def get_type(hand: Hand) -> HandType:
     ]):
         if hand >= best:
             return HandType(t)
+
+    return Hand.HIGH_BEST
 
 def to_str(hand: Hand) -> str:
     '''Pretty print hand type'''
