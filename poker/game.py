@@ -392,10 +392,10 @@ class Game:
 
                 # give remainder to first player past button
                 if remainder > 0:
-                    for i in self.pl_iter(start=self.button_id, skip_start=True):
-                        if i in winners:
-                            self.pl_data[i].chips += remainder
-                            break
+                    i = self.next_player(self.button_id)
+                    while i not in winners:
+                        i += 1
+                    self.pl_data[i].chips += remainder
 
         # clear pots
         self.pots = [Pot(0, {}, 0)]
@@ -481,7 +481,6 @@ class Game:
         reverse=False,
         include_states=tuple(PlayerState),
         exclude_states=(),
-        skip_start=False
     ) -> Iterator[int]:
         '''
         Iterator over player ids
@@ -490,36 +489,23 @@ class Game:
                reverse: moves clockwise if true
         include_states: which states to include in iterator
         exclude_states: which states to exclude in iterator
-            skip_start: skips start player
         '''
         start = self.current_pl_id if start is None else start
         reverse = -1 if reverse else 1
-        first = skip_start
 
         for i in range(start, start + len(self._players) * reverse, reverse):
             idx = i % len(self._players)
             state = self.pl_data[idx].state
             if state in include_states and state not in exclude_states:
-                if first:
-                    first = False
-                    continue
                 yield idx
 
-        # yield start player id at end
-        if skip_start:
-            yield start % len(self._players)
-
-    def in_hand_players(self, start=None, reverse=False, skip_start=False) -> Iterator[int]:
+    def in_hand_players(self, start=None, reverse=False) -> Iterator[int]:
         ''''Wrapper for pl_iter excluding players not in the current hand'''
-        return self.pl_iter(start, reverse, exclude_states=[PlayerState.OUT], skip_start=skip_start)
+        return self.pl_iter(start, reverse,exclude_states=(PlayerState.OUT,))
 
-    def not_folded_players(self, start=None, reverse=False, skip_start=False) -> Iterator[int]:
+    def not_folded_players(self, start=None, reverse=False) -> Iterator[int]:
         '''Wrap pl_iter for players that have not folded'''
-        return self.pl_iter(
-            start, reverse,
-            exclude_states=(PlayerState.OUT, PlayerState.FOLDED),
-            skip_start=skip_start
-        )
+        return self.pl_iter(start, reverse,exclude_states=(PlayerState.OUT, PlayerState.FOLDED))
 
     ### PLAYER COUNTS ###
 
