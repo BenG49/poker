@@ -52,7 +52,7 @@ class TerminalPlayer(Player):
         print('Your turn.')
         print('Chips:', ', '.join((
             f'P{p}:(${game.pl_data[p].chips}, bet ${game.current_pl_pot.bets.get(p, 0)})'
-            for p in game.pl_iter(skip_start=True)
+            for p in game.pl_iter()
         )))
         print('Community:', game.community)
         print('Your hand:', self.hand)
