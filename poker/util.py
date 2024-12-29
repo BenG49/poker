@@ -2,7 +2,7 @@
 Utility classes Suit, Rank, Card, Hand
 '''
 from copy import copy
-from enum import Enum, IntEnum
+from enum import auto, Enum, IntEnum
 from functools import wraps
 from math import prod
 from random import shuffle
@@ -60,21 +60,18 @@ class Action(Enum):
     - CALL over ALL_IN
     - ALL_IN over RAISE
     '''
-    CALL = 0
-    RAISE = 1
-    ALL_IN = 2
-    FOLD = 3
+    CALL = auto()
+    RAISE = auto()
+    ALL_IN = auto()
+    FOLD = auto()
 
     def to_str(self, amt: Optional[int]) -> str:
         '''Action as string, meant to be concatednated to player name'''
-        if self == Action.CALL:
-            return 'called'
-        if self == Action.RAISE:
-            return f'raised ${amt}'
-        if self == Action.ALL_IN:
-            return 'went all in'
-        if self == Action.FOLD:
-            return 'folded'
+        match self:
+            case Action.CALL:   return 'called'
+            case Action.RAISE:  return f'raised ${amt}'
+            case Action.ALL_IN: return 'went all in'
+            case Action.FOLD:   return 'folded'
 
     def to_short_str(self, amt: Optional[int]) -> str:
         '''Short string form (used in CFR)'''
@@ -89,10 +86,10 @@ class Action(Enum):
 
 class BettingStage(Enum):
     '''Betting stages'''
-    PREFLOP = 0
-    FLOP = 1
-    TURN = 2
-    RIVER = 3
+    PREFLOP = auto()
+    FLOP = auto()
+    TURN = auto()
+    RIVER = auto()
 
 class Suit(IntEnum):
     '''Suit enum'''

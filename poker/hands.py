@@ -1,24 +1,24 @@
 '''
 Functions to evaluate and rank poker hands
 '''
-from enum import IntEnum
+from enum import auto, Enum
 from itertools import combinations
 from typing import List
 
 from .util import Card, Rank, same
 
-class HandType(IntEnum):
+class HandType(Enum):
     '''Ranked categories of poker hands'''
-    HIGH = 0
-    PAIR = 1
-    TPAIR = 2
-    TRIPS = 3
-    STRAIGHT = 4
-    FLUSH = 5
-    FULL = 6
-    FOURS = 7
-    STR_FLUSH = 8
-    ROYAL_FLUSH = 9
+    HIGH = auto()
+    PAIR = auto()
+    TPAIR = auto()
+    TRIPS = auto()
+    STRAIGHT = auto()
+    FLUSH = auto()
+    FULL = auto()
+    FOURS = auto()
+    STR_FLUSH = auto()
+    ROYAL_FLUSH = auto()
 
     def is_flush(self) -> bool:
         '''If hand type is a flush'''
