@@ -22,16 +22,21 @@ def load(file: BinaryIO) -> GameHistory:
     '''
     data = tomli.load(file)
 
-    if data['variant'] != 'NT':
+    if data['variant'] not in ('NT', 'FT'):
         raise PHHParseError('Game variant not supported!')
     if any(a != 0 for a in data['antes']):
         raise PHHParseError('Nonzero antes not supported!')
-    if data['min_bet'] != 0:
-        raise PHHParseError('Nonzero min bet not supported!')
+
+    fixed = data['variant'] == 'FT'
+
+    if not fixed and data['min_bet'] != 0:
+        raise NotImplementedError
 
     out = GameHistory(
         small_blind=data['blinds_or_straddles'][0],
-        big_blind=data['blinds_or_straddles'][1]
+        big_blind=data['blinds_or_straddles'][1],
+        small_bet=data['small_bet'] if fixed else 0,
+        big_bet=data['big_bet'] if fixed else 0,
     )
     out.hand_count = 1
     out.cards.append([])
@@ -121,15 +126,24 @@ def dump(history: GameHistory, hand: int=0) -> str:
     if history.hand_count < hand + 1:
         return ''
 
-    out = 'variant = "NT"\n'
-    out += f'antes = {[0] * history.players}\n'
     blinds = [history.small_blind, history.big_blind] + [0] * (history.players - 2)
-    out += f'blinds_or_straddles = {blinds}\n'
-    out += 'min_bet = 0\n'
-    out += f'starting_stacks = {history.chips[hand]}\n'
-    out += f'seats = {history.players}\n'
-    out += f'hand = {hand+1}\n'
-    out += 'actions = [\n'
+    variant = 'FT' if history.is_limit() else 'NT'
+    bet_limits = (
+        f'small_bet = {history.small_bet}\nbig_bet = {history.big_bet}'
+        if history.is_limit() else
+        'min_bet = 0'
+    )
+
+    out = (
+        f'variant = "{variant}"\n'
+        f'antes = {[0] * history.players}\n'
+        f'blinds_or_straddles = {blinds}\n'
+        f'{bet_limits}\n'
+        f'starting_stacks = {history.chips[hand]}\n'
+        f'seats = {history.players}\n'
+        f'hand = {hand+1}\n'
+        'actions = [\n'
+    )
 
     board = history.cards[hand]
 

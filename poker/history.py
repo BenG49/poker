@@ -40,10 +40,12 @@ class ResultEntry:
 
 class GameHistory:
     '''Datastructure to store poker game history, works with Game from poker.game'''
-    def __init__(self, big_blind, small_blind):
+    def __init__(self, big_blind, small_blind, big_bet, small_bet):
         self.players = -1
         self.big_blind = big_blind
         self.small_blind = small_blind
+        self.big_bet = big_bet
+        self.small_bet = small_bet
 
         self.chips:   List[List[int]] = []
         self.actions: List[Optional[ActionEntry]] = []
@@ -137,8 +139,12 @@ class GameHistory:
             lists[action.stage].append(action)
         return (lists.get(r) for r in iter(BettingStage))
 
+    def is_limit(self) -> bool:
+        '''Is game fixed-limit?'''
+        return self.small_bet > 0 or self.big_bet > 0
+
     def __str__(self) -> str:
-        out = ''
+        out = ('Fixed' if self.is_limit() else 'No') + ' Limit Hold\'em\n'
 
         for i, (hand, cards, results) in enumerate(zip(self._hands, self.cards, self.results)):
             out += 'Hands: ' + str(hand) + '\n'
@@ -162,19 +168,26 @@ class GameHistory:
                         sb = 1
                         bb = 2
 
-                    out += f'P{sb} posts small blind (${self.small_blind})\n'
-                    out += f'P{bb} posts big blind (${self.big_blind})\n'
+                    out += (
+                        f'P{sb} posted small blind (${self.small_blind})\n'
+                        f'P{bb} posted big blind (${self.big_blind})\n'
+                    )
 
                 for action in actions:
                     out += f'P{action.player+1} {action.move[0].to_str(action.move[1])}\n'
 
             out += '\n'
             for result in results:
-                winners = ', '.join(str(w+1) for w in result.winners)
-                desc = hands.to_str(result.winning_hand) if \
+                desc = hands.to_str(result.winning_hand) if   \
                     result.winning_hand is not None else \
                     'others folding'
-                out += f'Players [{winners}] win ${result.pot_total} with {desc}\n'
+                out += (
+                    'Players ['
+                    + ', '.join(str(w+1) for w in result.winners)
+                    + f'] win ${result.pot_total} with '
+                    + desc
+                    + '\n'
+                )
             out += '\n'
 
         return out[:-2]

@@ -209,7 +209,12 @@ class Game:
         self.community: List[Card] = []
         self.pots: List[Pot] = [Pot(0, {}, 0)]
 
-        self.history: GameHistory = GameHistory(self.big_blind, self.small_blind)
+        self.history: GameHistory = GameHistory(
+            self.big_blind,
+            self.small_blind,
+            self.big_bet,
+            self.small_bet
+        )
 
         ### PRIVATE ###
         self._players: List[Player] = []
@@ -434,7 +439,7 @@ class Game:
 
     def is_limit(self) -> bool:
         '''Is game fixed-limit?'''
-        return self.small_bet > 0 and self.big_bet > 0
+        return self.small_bet > 0 or self.big_bet > 0
 
     def betting_stage(self) -> BettingStage:
         '''What the current betting stage is'''
