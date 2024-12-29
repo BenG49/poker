@@ -33,7 +33,7 @@ def run_cfr_from_file():
 
 def tournament():
     boteval.run_tournament(
-        {'buy_in': 1000, 'big_blind': 20},
+        {'buy_in': 1000, 'big_blind': 20, 'small_blind': 10},
         2_000,
         [
             [lambda: bots.Raiser(20),    'BB Raiser'],
