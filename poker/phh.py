@@ -8,7 +8,7 @@ from typing import BinaryIO
 from pip._vendor import tomli
 
 from . import hands
-from .game_data import Action, BettingStage
+from .game_data import Action, BettingStage, GameConfig
 from .history import ActionEntry, GameHistory, ResultEntry
 from .util import Card, count, same
 
@@ -30,12 +30,17 @@ def load(file: BinaryIO) -> GameHistory:
     if not fixed and data['min_bet'] != 0:
         raise NotImplementedError
 
-    out = GameHistory(
+    antes = data['antes']
+    out = GameHistory(GameConfig(
         small_blind=data['blinds_or_straddles'][0],
         big_blind=data['blinds_or_straddles'][1],
         small_bet=data['small_bet'] if fixed else 0,
         big_bet=data['big_bet'] if fixed else 0,
-    )
+        min_bet=0 if fixed else data['min_bet'],
+        ante_amt=max(antes),
+        # TODO: make this cover other cases
+        ante_idx=None if same(antes) else (-1 if antes[-1] == max(antes) else 1)
+    ))
     out.hand_count = 1
     out.cards.append([])
     out.chips.append(data['starting_stacks'])
@@ -46,7 +51,7 @@ def load(file: BinaryIO) -> GameHistory:
 
     # keep track of pots for results
     fold_chips = [0]
-    pots = [{p: min(out.big_blind, out.chips[0][p]) for p in range(out.players)}]
+    pots = [{p: min(out.cfg.big_blind, out.chips[0][p]) for p in range(out.players)}]
 
     stage_it = iter(BettingStage)
     stage = next(stage_it)
@@ -127,11 +132,11 @@ def dump(history: GameHistory, hand: int=0) -> str:
     if history.hand_count < hand + 1:
         return ''
 
-    blinds = [history.small_blind, history.big_blind] + [0] * (history.players - 2)
-    variant = 'FT' if history.is_limit() else 'NT'
+    blinds = [history.cfg.small_blind, history.cfg.big_blind] + [0] * (history.players - 2)
+    variant = 'FT' if history.cfg.is_limit() else 'NT'
     bet_limits = (
-        f'small_bet = {history.small_bet}\nbig_bet = {history.big_bet}'
-        if history.is_limit() else
+        f'small_bet = {history.cfg.small_bet}\nbig_bet = {history.cfg.big_bet}'
+        if history.cfg.is_limit() else
         'min_bet = 0'
     )
 

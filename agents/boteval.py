@@ -43,7 +43,7 @@ def boteval(
             game.step_move()
         payoff += game.pl_data[1].chips - game.buy_in
 
-    return payoff / rounds / (game.big_blind / 1000.)
+    return payoff / rounds / (game.cfg.big_blind / 1000.)
 
 def run_tournament(game_config: dict, rounds: int, bots: List[Tuple[Callable[[], Player], str]]):
     '''Run round robin tournament between bots, print ranked results'''

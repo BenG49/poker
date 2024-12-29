@@ -5,8 +5,8 @@ from typing import Iterator, List, Optional
 
 from . import hands
 from .game_data import (
-    Action, BettingStage, EmptyPlayer, GameState, InvalidMoveError, Move, Player, PlayerData,
-    PlayerState, Pot
+    Action, BettingStage, EmptyPlayer, GameConfig, GameState, InvalidMoveError, Move, Player,
+    PlayerData, PlayerState, Pot
 )
 from .history import GameHistory
 from .util import Card, Deck, check_throw, count
@@ -20,7 +20,7 @@ class Game:
         '''Replays game history with an iterator through each game state'''
         # NOTE: does not yield state between last move and showdown
 
-        game = Game(0, history.big_blind, history.small_blind)
+        game = Game(0, history.cfg)
         for _ in range(history.players):
             game.add_player()
 
@@ -48,13 +48,10 @@ class Game:
 
                 yield game
 
-    def __init__(self, buy_in, big_blind, small_blind, big_bet=0, small_bet=0):
+    def __init__(self, buy_in, cfg: GameConfig):
         # constants
         self.buy_in: int = buy_in
-        self.big_blind: int = big_blind
-        self.small_blind: int = small_blind
-        self.big_bet: int = big_bet
-        self.small_bet: int = small_bet
+        self.cfg = cfg
 
         # game state
         self.state: GameState = GameState.HAND_DONE
@@ -71,12 +68,7 @@ class Game:
         self.community: List[Card] = []
         self.pots: List[Pot] = [Pot(0, {}, 0)]
 
-        self.history: GameHistory = GameHistory(
-            self.big_blind,
-            self.small_blind,
-            self.big_bet,
-            self.small_bet
-        )
+        self.history: GameHistory = GameHistory(self.cfg)
 
         ### PRIVATE ###
         self._players: List[Player] = []
@@ -123,17 +115,17 @@ class Game:
         self.bb_id = self.next_player(self.sb_id)
 
         # small blind
-        sb_amt = min(self.small_blind, self.pl_data[self.sb_id].chips)
+        sb_amt = min(self.cfg.small_blind, self.pl_data[self.sb_id].chips)
         if sb_amt > 0:
             self.__bet(self.sb_id, sb_amt)
 
         # big blind
-        bb_amt = min(self.big_blind, self.pl_data[self.bb_id].chips)
+        bb_amt = min(self.cfg.big_blind, self.pl_data[self.bb_id].chips)
         if bb_amt > 0:
             self.__bet(self.bb_id, bb_amt)
 
         # no matter what, rest of players have to match big blind raise
-        self.pots[-1].total_raised = self.big_blind
+        self.pots[-1].total_raised = self.cfg.big_blind
 
         # reset number of raises allowed this round
         self.raises_left = 5
@@ -299,10 +291,6 @@ class Game:
         '''Is game running?'''
         return self.state == GameState.RUNNING
 
-    def is_limit(self) -> bool:
-        '''Is game fixed-limit?'''
-        return self.small_bet > 0 or self.big_bet > 0
-
     def betting_stage(self) -> BettingStage:
         '''What the current betting stage is'''
         return {
@@ -315,8 +303,8 @@ class Game:
     def get_current_limit(self) -> int:
         '''Get fixed limit for current betting round'''
         if self.betting_stage() in (BettingStage.PREFLOP, BettingStage.FLOP):
-            return self.small_bet
-        return self.big_bet
+            return self.cfg.small_bet
+        return self.cfg.big_bet
 
     def raise_to(self, pl_id: int, raise_to: int) -> Optional[int]:
         '''Convert from raising to the overall pot raise TO raising from the current bet.'''
@@ -339,7 +327,7 @@ class Game:
             out.append((Action.CALL, None))
         else:
             out.append((Action.CALL, None))
-            if self.is_limit():
+            if self.cfg.is_limit():
                 raise_amt = self.get_current_limit()
                 # raise to complete limit if current raise is small
                 if self.chips_to_call(pl_id) < self.get_current_limit() / 2:
@@ -365,7 +353,7 @@ class Game:
     def translate_move(self, pl_id: int, action: Action, amt: int) -> Move:
         '''Translate move into standard move format'''
         if action == Action.RAISE:
-            if amt is None and self.is_limit():
+            if amt is None and self.cfg.is_limit():
                 amt = self.get_current_limit()
                 # raise to complete limit if current raise is small
                 if self.chips_to_call(pl_id) < self.get_current_limit() / 2:
@@ -392,7 +380,7 @@ class Game:
         if self.pl_data[pl_id].state != PlayerState.TO_MOVE:
             return False, f'Player {pl_id} has state {self.pl_data[pl_id].state.name}, cannot move.'
 
-        at_bet_limit = self.is_limit() and len(self._players) > 2 and self.raises_left <= 0
+        at_bet_limit = self.cfg.is_limit() and len(self._players) > 2 and self.raises_left <= 0
         if (action == Action.RAISE or
                (action == Action.ALL_IN and amt >= self.get_current_limit() / 2)) and \
            at_bet_limit:

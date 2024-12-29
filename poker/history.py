@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 from . import hands
-from .game_data import BettingStage, Move
+from .game_data import BettingStage, GameConfig, Move
 from .hands import Hand
 from .util import Card, reorder
 
@@ -39,12 +39,9 @@ class ResultEntry:
 
 class GameHistory:
     '''Datastructure to store poker game history, works with Game from poker.game'''
-    def __init__(self, big_blind, small_blind, big_bet, small_bet):
+    def __init__(self, cfg: GameConfig):
         self.players = -1
-        self.big_blind = big_blind
-        self.small_blind = small_blind
-        self.big_bet = big_bet
-        self.small_bet = small_bet
+        self.cfg = cfg
 
         self.chips:   List[List[int]] = []
         self.actions: List[Optional[ActionEntry]] = []
@@ -138,12 +135,8 @@ class GameHistory:
             lists[action.stage].append(action)
         return (lists.get(r) for r in iter(BettingStage))
 
-    def is_limit(self) -> bool:
-        '''Is game fixed-limit?'''
-        return self.small_bet > 0 or self.big_bet > 0
-
     def __str__(self) -> str:
-        out = ('Fixed' if self.is_limit() else 'No') + ' Limit Hold\'em\n'
+        out = ('Fixed' if self.cfg.is_limit() else 'No') + ' Limit Hold\'em\n'
 
         for i, (hand, cards, results) in enumerate(zip(self._hands, self.cards, self.results)):
             out += 'Hands: ' + str(hand) + '\n'
@@ -159,7 +152,7 @@ class GameHistory:
                     ncards = 3 if r == BettingStage.FLOP else 1
                     out += f'New Cards: {cards[card_idx:card_idx + ncards]}\n'
                     card_idx += ncards
-                elif self.big_blind > 0 and self.small_blind > 0:
+                elif self.cfg.has_blinds():
                     if self.players == 2:
                         bb = 1
                         sb = 2
@@ -168,8 +161,8 @@ class GameHistory:
                         bb = 2
 
                     out += (
-                        f'P{sb} posted small blind (${self.small_blind})\n'
-                        f'P{bb} posted big blind (${self.big_blind})\n'
+                        f'P{sb} posted small blind (${self.cfg.small_blind})\n'
+                        f'P{bb} posted big blind (${self.cfg.big_blind})\n'
                     )
 
                 for action in actions:

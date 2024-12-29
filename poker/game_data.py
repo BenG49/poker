@@ -82,8 +82,47 @@ class GameState(Enum):
     HAND_DONE = auto()
 
 @dataclass
+class GameConfig:
+    '''Stores configuration for fixed or no-limit hold'em game'''
+
+    @staticmethod
+    def nl(bb: int, min_bet: int=0) -> 'GameConfig':
+        '''Create no-limit game'''
+        return GameConfig(bb // 2, bb, 0, 0, min_bet)
+
+    @staticmethod
+    def fl(bb: int) -> 'GameConfig':
+        '''Create fixed-limit game'''
+        return GameConfig(bb // 2, bb, bb, bb * 2)
+
+    # blinds
+    small_blind: int
+    big_blind: int
+
+    # limits
+    small_bet: int
+    big_bet: int
+
+    # minimum bet for the first raise of each round
+    min_bet: int = 0
+
+    # antes
+    ante_amt: int = 0
+    # None for antes for everyone, 1 for big blind ante, -1 for button ante
+    ante_idx: Optional[int] = None
+
+    def has_blinds(self) -> bool:
+        '''Game has blinds?'''
+        return self.small_bet > 0 and self.big_bet > 0
+
+    def is_limit(self) -> bool:
+        '''Is game fixed-limit?'''
+        return self.small_bet > 0 or self.big_bet > 0
+
+@dataclass
 class Pot:
-    '''Represent the pot or a split pot'''
+    '''Represent the pot or a side pot'''
+
     # chips in pot from previous betting stages
     chips: int
     # bets in pot from current round { pl_id: chips }
