@@ -3,7 +3,7 @@ Classes to run a N player No-Limit Texas Hold'em game.
 '''
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import Enum
+from enum import auto, Enum
 from typing import Iterator, List, Dict, Tuple, Optional, Self
 
 from . import hands
@@ -26,21 +26,21 @@ class PlayerState(Enum):
     FOLDED:  folded
     OUT:     either not in the current hand or out of chips
     '''
-    TO_CALL = 0
-    MOVED = 1
-    ALL_IN = 2
-    FOLDED = 3
-    OUT = 4
+    TO_MOVE = auto()
+    MOVED = auto()
+    ALL_IN = auto()
+    FOLDED = auto()
+    OUT = auto()
 
     def active(self) -> bool:
         '''True if player will still make moves in future betting stages'''
-        return self in (PlayerState.TO_CALL, PlayerState.MOVED)
+        return self in (PlayerState.TO_MOVE, PlayerState.MOVED)
 
 class GameState(Enum):
     '''Poker game state'''
-    OVER = 0
-    RUNNING = 1
-    HAND_DONE = 2
+    OVER = auto()
+    RUNNING = auto()
+    HAND_DONE = auto()
 
 @dataclass
 class Pot:
@@ -126,7 +126,7 @@ class PlayerData:
         if self.chips == 0:
             self.state = PlayerState.OUT
         else:
-            self.state = PlayerState.TO_CALL
+            self.state = PlayerState.TO_MOVE
 
         self.latest_pot = 0
 
@@ -317,14 +317,14 @@ class Game:
                         if i == self.current_pl_id:
                             continue
                         if pl.state == PlayerState.MOVED:
-                            pl.state = PlayerState.TO_CALL
+                            pl.state = PlayerState.TO_MOVE
                 self.__bet(self.current_pl_id, bet)
 
             self.history.add_action(self.betting_stage(), self.current_pl_id, (action, amt))
 
         self.current_pl_id = self.next_player()
 
-        if (PlayerState.TO_CALL not in map(lambda p: p.state, self.pl_data)) or \
+        if (PlayerState.TO_MOVE not in map(lambda p: p.state, self.pl_data)) or \
            self.not_folded_count() == 1:
             self.end_round()
 
@@ -345,7 +345,7 @@ class Game:
         # give everyone one turn
         for pl in self.pl_data:
             if pl.state == PlayerState.MOVED:
-                pl.state = PlayerState.TO_CALL
+                pl.state = PlayerState.TO_MOVE
 
         self.current_pl_id = self.next_player(self.bb_id)
 
@@ -353,7 +353,7 @@ class Game:
         self.raises_left = 5
 
         # check if only one player remaining or showdown
-        if count(self.pl_iter(include_states=(PlayerState.MOVED, PlayerState.TO_CALL))) < 2 or \
+        if count(self.pl_iter(include_states=(PlayerState.MOVED, PlayerState.TO_MOVE))) < 2 or \
            self.betting_stage() == BettingStage.RIVER:
             self.end_hand()
 
@@ -527,7 +527,7 @@ class Game:
         if amt is not None and amt < 0:
             return False, 'Positive value is required for amt.'
 
-        if self.pl_data[pl_id].state != PlayerState.TO_CALL:
+        if self.pl_data[pl_id].state != PlayerState.TO_MOVE:
             return False, f'Player {pl_id} has state {self.pl_data[pl_id].state.name}, cannot move.'
 
         at_bet_limit = self.is_limit() and len(self._players) > 2 and self.raises_left <= 0
@@ -616,7 +616,7 @@ class Game:
         self.pl_data.append(PlayerData(
             chips=self.buy_in,
             latest_pot=len(self.pots) - 1,
-            state=PlayerState.TO_CALL)
+            state=PlayerState.TO_MOVE)
         )
         self._players.append(player)
 
