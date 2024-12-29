@@ -2,11 +2,11 @@
 Utility classes Suit, Rank, Card, Hand
 '''
 from copy import copy
-from enum import auto, Enum, IntEnum
+from enum import IntEnum
 from functools import wraps
 from math import prod
 from random import shuffle
-from typing import Callable, List, Iterable, Optional, Tuple, Type, TypeVar
+from typing import Callable, List, Iterable, Tuple, Type, TypeVar
 
 T = TypeVar('T')
 
@@ -47,49 +47,6 @@ def check_throw(exception_t: Type[Exception]):
         return inner
 
     return decorator
-
-class Action(Enum):
-    '''
-    Actions that a player can take:
-    CALL:   call current bet, or check if there has been no raise
-    RAISE:  raise by amt MORE THAN current bet
-    ALL_IN: post all of player's chips
-    FOLD:   fold
-
-    Precedence for identical moves:
-    - CALL over ALL_IN
-    - ALL_IN over RAISE
-    '''
-    CALL = auto()
-    RAISE = auto()
-    ALL_IN = auto()
-    FOLD = auto()
-
-    def to_str(self, amt: Optional[int]) -> str:
-        '''Action as string, meant to be concatednated to player name'''
-        match self:
-            case Action.CALL:   return 'called'
-            case Action.RAISE:  return f'raised ${amt}'
-            case Action.ALL_IN: return 'went all in'
-            case Action.FOLD:   return 'folded'
-
-    def to_short_str(self, amt: Optional[int]) -> str:
-        '''Short string form (used in CFR)'''
-        if self == Action.RAISE:
-            return 'r' + str(amt)
-
-        return {
-            Action.ALL_IN: 'a',
-            Action.CALL: 'c',
-            Action.FOLD: 'f'
-        }[self]
-
-class BettingStage(Enum):
-    '''Betting stages'''
-    PREFLOP = auto()
-    FLOP = auto()
-    TURN = auto()
-    RIVER = auto()
 
 class Suit(IntEnum):
     '''Suit enum'''

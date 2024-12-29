@@ -9,8 +9,8 @@ import random
 from agents import bots
 from poker import phh
 from poker.hands import evaluate, Hand
-from poker.util import Action, Card, count, same
-from poker.game import Game
+from poker.util import Card, count, same
+from poker.game import Action, Game
 
 class TestUtils(unittest.TestCase):
     def test_same(self):

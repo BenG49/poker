@@ -8,8 +8,9 @@ from typing import BinaryIO
 from pip._vendor import tomli
 
 from . import hands
+from .game_data import Action, BettingStage
 from .history import ActionEntry, GameHistory, ResultEntry
-from .util import Action, BettingStage, Card, count, same
+from .util import Card, count, same
 
 class PHHParseError(ValueError):
     '''Error parsing .phh file'''

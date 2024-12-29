@@ -6,10 +6,9 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 from . import hands
+from .game_data import BettingStage, Move
 from .hands import Hand
-from .util import Action, BettingStage, Card, reorder
-
-Move = Tuple[Action, Optional[int]]
+from .util import Card, reorder
 
 @dataclass
 class ActionEntry:

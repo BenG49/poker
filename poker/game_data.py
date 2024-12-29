@@ -1,0 +1,192 @@
+'''Utility classes and enums for Game'''
+
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from enum import Enum, auto
+from typing import Dict, Iterator, Optional, Tuple
+
+from poker.util import same
+
+
+class InvalidMoveError(ValueError):
+    '''Invalid move supplied to game (e.g. negative raise)'''
+
+
+class Action(Enum):
+    '''
+    Actions that a player can take:
+    CALL:   call current bet, or check if there has been no raise
+    RAISE:  raise by amt MORE THAN current bet
+    ALL_IN: post all of player's chips
+    FOLD:   fold
+
+    Precedence for identical moves:
+    - CALL over ALL_IN
+    - ALL_IN over RAISE
+    '''
+    CALL = auto()
+    RAISE = auto()
+    ALL_IN = auto()
+    FOLD = auto()
+
+    def to_str(self, amt: Optional[int]) -> str:
+        '''Action as string, meant to be concatednated to player name'''
+        match self:
+            case Action.CALL:   return 'called'
+            case Action.RAISE:  return f'raised ${amt}'
+            case Action.ALL_IN: return 'went all in'
+            case Action.FOLD:   return 'folded'
+
+    def to_short_str(self, amt: Optional[int]) -> str:
+        '''Short string form (used in CFR)'''
+        if self == Action.RAISE:
+            return 'r' + str(amt)
+
+        return {
+            Action.ALL_IN: 'a',
+            Action.CALL: 'c',
+            Action.FOLD: 'f'
+        }[self]
+
+class BettingStage(Enum):
+    '''Betting stages'''
+    PREFLOP = auto()
+    FLOP = auto()
+    TURN = auto()
+    RIVER = auto()
+
+class PlayerState(Enum):
+    '''
+    Stores player's state for the current betting stage
+
+    TO_CALL: still has to call, check, or raise
+    MOVED:   called, checked, or raised
+    ALL_IN:  went all in
+    FOLDED:  folded
+    OUT:     either not in the current hand or out of chips
+    '''
+    TO_MOVE = auto()
+    MOVED = auto()
+    ALL_IN = auto()
+    FOLDED = auto()
+    OUT = auto()
+
+    def active(self) -> bool:
+        '''True if player will still make moves in future betting stages'''
+        return self in (PlayerState.TO_MOVE, PlayerState.MOVED)
+
+class GameState(Enum):
+    '''Poker game state'''
+    OVER = auto()
+    RUNNING = auto()
+    HAND_DONE = auto()
+
+@dataclass
+class Pot:
+    '''Represent the pot or a split pot'''
+    # chips in pot from previous betting stages
+    chips: int
+    # bets in pot from current round { pl_id: chips }
+    bets: Dict[int, int]
+    # amount raised (usually max bet)
+    total_raised: int
+
+    ### MODIFIERS ###
+    def fold(self, pl_id: int):
+        '''Fold pl_id'''
+        self.chips += self.bets.pop(pl_id, 0)
+
+    def collect_bets(self):
+        '''Put all bets in main pot'''
+        self.total_raised = 0
+        for key, val in self.bets.items():
+            self.chips += val
+            self.bets[key] = 0
+
+    def raised(self) -> int:
+        '''The amount the pot has been raised'''
+        self.total_raised = max(self.total_raised, 0, *self.bets.values())
+        return self.total_raised
+
+    ### GETTERS ###
+    def total(self) -> int:
+        '''Total chips in pot from all hands'''
+        return self.chips + sum(self.bets.values())
+
+    def add(self, pl_id: int, chips: int):
+        '''Add chips to pl_id's bet'''
+        self.bets[pl_id] = chips + self.bets.get(pl_id, 0)
+        self.total_raised = max(self.total_raised, self.bets[pl_id])
+
+    def chips_to_call(self, pl_id: int) -> int:
+        '''Minimum amount required to call'''
+        return self.raised() - self.bets.get(pl_id, 0)
+
+    def players(self) -> Iterator[int]:
+        '''List of player ids in pot'''
+        return self.bets.keys()
+
+    def split(self) -> Optional['Pot']:
+        '''
+        Splits pot into side pot if bets are not equal, which
+        assumes that the player with the minimum bet is all-in.
+        Should be called at the end of the hand.
+        '''
+        if same(self.bets.values()):
+            return None
+
+        max_stake = min(self.bets.values())
+        next_bets = {}
+
+        for pl_id, bet in self.bets.items():
+            if bet == max_stake:
+                continue
+
+            self.bets[pl_id] = max_stake
+            next_bets[pl_id] = bet - max_stake
+
+        return Pot(0, next_bets, max(0, *next_bets.values()))
+
+    def __repr__(self) -> str:
+        return self.__str__()
+    def __str__(self) -> str:
+        bets = ', '.join(f'P{p}:${b}' for p, b in sorted(self.bets.items()))
+        return f'(${self.chips}{" " if bets else ""}{bets})'
+
+@dataclass
+class PlayerData:
+    '''Public player data'''
+    chips: int
+    latest_pot: int
+    state: PlayerState
+
+    def reset_state(self):
+        '''Should be called at hand init, does not account for live bets'''
+        if self.chips == 0:
+            self.state = PlayerState.OUT
+        else:
+            self.state = PlayerState.TO_MOVE
+
+        self.latest_pot = 0
+
+
+Move = Tuple[Action, Optional[int]]
+
+class Player(ABC):
+    '''Abstract base class for players'''
+    def __init__(self):
+        self.hand = []
+        self.id = None
+
+    @abstractmethod
+    def move(self, game) -> Move:
+        '''Supply move given game state'''
+
+    def chips(self, game) -> int:
+        '''Helper method to get chips for current player'''
+        return game.pl_data[self.id].chips
+
+class EmptyPlayer(Player):
+    '''Empty Player impl'''
+    def move(self, _):
+        ...
