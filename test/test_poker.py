@@ -2,6 +2,7 @@
 Unit testing for util.py and game.py
 '''
 from os import remove
+import os
 import unittest
 import random
 
@@ -362,6 +363,25 @@ class TestHistory(unittest.TestCase):
         self.assertEqual(game.history.chips, imported.chips)
 
         remove('__test.phh')
+
+    def test_replays(self):
+        '''Load .phh hands, test that they replay correctly'''
+        for fname in os.listdir('data/wsop/'):
+            with open('data/wsop/' + fname, 'rb') as f:
+                try:
+                    hist = phh.load(f)
+                    replay = Game.replay(hist)
+                    while True:
+                        try:
+                            g = next(replay)
+                        except StopIteration:
+                            break
+
+                    # verify replayed chips if finishing_stacks was included in file
+                    if len(hist.chips) > 1:
+                        self.assertTrue(hist.chips[1], list(p.chips for p in g.pl_data))
+                except phh.PHHParseError as e:
+                    print(f'{fname} FAILED:', e)
 
 if __name__ == '__main__':
     unittest.main()

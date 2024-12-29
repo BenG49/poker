@@ -16,10 +16,7 @@ class PHHParseError(ValueError):
 
 def load(file: BinaryIO) -> GameHistory:
     # pylint: disable=protected-access
-    '''
-    Construct GameHistory from .phh file.
-    Does not handle ?? for holecards.
-    '''
+    '''Construct GameHistory from .phh file.'''
     data = tomli.load(file)
 
     if data['variant'] not in ('NT', 'FT'):
@@ -43,6 +40,8 @@ def load(file: BinaryIO) -> GameHistory:
     out.chips.append(data['starting_stacks'])
     out.players = len(out.chips[0])
     out._hands.append([None] * out.players)
+    if 'finishing_stacks' in data:
+        out.chips.append(data['finishing_stacks'])
 
     # keep track of pots for results
     fold_chips = [0]
@@ -55,7 +54,8 @@ def load(file: BinaryIO) -> GameHistory:
 
         if actor == 'd':
             if a_type == 'dh':
-                out._hands[0][int(args[0][1])-1] = tuple(Card.new(args[1]))
+                h = [None if '?' in h else Card.new(h) for h in zip(args[1][0::2], args[1][1::2])]
+                out._hands[0][int(args[0][1])-1] = tuple(h)
             elif a_type == 'db':
                 card = Card.new(args[0])
                 out.cards[0].extend([card] if isinstance(card, Card) else card)

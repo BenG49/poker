@@ -1,6 +1,7 @@
 '''
 main.py
 '''
+import os
 import random
 
 from agents import bots
@@ -8,7 +9,6 @@ from agents import boteval
 from agents.cfr import CFR, CFRBot, InfoSet
 from poker import phh
 from poker.game import Game
-from poker.util import Action
 
 CFR_GAME_CONFIG = {
     'buy_in': 2,
@@ -65,16 +65,17 @@ def run_phh():
         for state in Game.replay(loaded):
             print(state)
 
-def limit_game():
-    game = Game(1000, 20, 10, 40, 20)
-    game.add_player()
-    game.add_player()
-    game.init_hand()
-    game.accept_move(Action.RAISE)
-    game.accept_move(Action.RAISE)
-    game.accept_move(Action.CALL)
-    game.accept_move(Action.FOLD)
-    print(game.history)
+def load_hands():
+    for fname in os.listdir('data/wsop/'):
+        with open('data/wsop/' + fname, 'rb') as f:
+            try:
+                loaded = phh.load(f)
+                print(f'{fname}: ', end='')
+                for _ in Game.replay(loaded):
+                    print('.', end='', flush='True')
+                print()
+            except phh.PHHParseError as e:
+                print(f'{fname} FAILED:', e)
 
 if __name__ == '__main__':
-    limit_game()
+    load_hands()
