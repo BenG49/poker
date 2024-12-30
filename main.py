@@ -9,6 +9,7 @@ from agents import boteval
 from agents.cfr import CFR, CFRBot, InfoSet
 from poker import phh
 from poker.game import Game
+from poker.game_data import GameConfig
 
 CFR_GAME_CONFIG = {
     'buy_in': 2,

@@ -63,6 +63,7 @@ class Game:
 
         # remaining raises allowed for current betting stage if fixed limit
         self.raises_left: int = -1
+        self.last_raise: int = cfg.min_bet
 
         self.pl_data: List[PlayerData] = []
         self.community: List[Card] = []
@@ -75,6 +76,8 @@ class Game:
         self._deck: Deck = Deck()
 
     def __bet(self, pl_id: int, chips: int):
+        # bets over limit should be validated beforehand, makes blinds simpler
+        chips = min(chips, self.pl_data[pl_id].chips)
         self.pl_data[pl_id].chips -= chips
         self.pots[self.pl_data[pl_id].latest_pot].add(pl_id, chips)
 
@@ -115,20 +118,27 @@ class Game:
         self.bb_id = self.next_player(self.sb_id)
 
         # small blind
-        sb_amt = min(self.cfg.small_blind, self.pl_data[self.sb_id].chips)
-        if sb_amt > 0:
-            self.__bet(self.sb_id, sb_amt)
+        self.__bet(self.sb_id, self.cfg.small_blind)
+        self.__bet(self.bb_id, self.cfg.big_blind)
 
-        # big blind
-        bb_amt = min(self.cfg.big_blind, self.pl_data[self.bb_id].chips)
-        if bb_amt > 0:
-            self.__bet(self.bb_id, bb_amt)
+        # antes
+        if self.cfg.ante_amt > 0:
+            match self.cfg.ante_idx:
+                case None: ante_players = self.in_hand_players()
+                case 1:    ante_players = (self.bb_id,)
+                case -1:   ante_players = (self.button_id,)
+            for i in ante_players:
+                # antes go into main pot chips, not bets
+                chips = min(self.cfg.ante_amt, self.pl_data[i].chips)
+                self.pl_data[i].chips -= chips
+                self.pots[self.pl_data[i].latest_pot].chips += chips
 
         # no matter what, rest of players have to match big blind raise
         self.pots[-1].total_raised = self.cfg.big_blind
 
         # reset number of raises allowed this round
         self.raises_left = 5
+        self.last_raise = self.cfg.min_bet
 
         self.current_pl_id = self.next_player(self.bb_id)
 
@@ -166,6 +176,7 @@ class Game:
 
             if bet is not None:
                 if bet > self.chips_to_call(self.current_pl_id):
+                    self.last_raise = bet - self.chips_to_call(self.current_pl_id)
                     # make everyone else call this raise
                     for i, pl in enumerate(self.pl_data):
                         if i == self.current_pl_id:
@@ -205,6 +216,7 @@ class Game:
 
         # reset number of raises allowed this round
         self.raises_left = 5
+        self.last_raise = self.cfg.min_bet
 
         # check if only one player remaining or showdown
         if count(self.pl_iter(include_states=(PlayerState.MOVED, PlayerState.TO_MOVE))) < 2 or \
@@ -309,7 +321,7 @@ class Game:
     def raise_to(self, pl_id: int, raise_to: int) -> Optional[int]:
         '''Convert from raising to the overall pot raise TO raising from the current bet.'''
         current_raise = self.chips_to_call(pl_id)
-        if current_raise > raise_to:
+        if current_raise > raise_to or raise_to - current_raise < self.last_raise:
             return None
         return raise_to - current_raise
 
@@ -345,7 +357,7 @@ class Game:
                     out.append((Action.ALL_IN, None))
             else:
                 # no-limit
-                out.extend([(Action.RAISE, i) for i in range(1, free_chips)])
+                out.extend([(Action.RAISE, i) for i in range(max(1, self.last_raise), free_chips)])
                 out.append((Action.ALL_IN, None))
 
         return out
@@ -397,8 +409,12 @@ class Game:
                 return False, 'Expected positive value for move RAISE.'
 
             if chips < to_call + amt:
-                return False, (f'Cannot raise by {to_call + amt} chips,'
-                                'more than available {chips} chips')
+                return False, (f'Cannot raise by {to_call + amt} chips, '
+                               f'more than available {chips} chips')
+
+            if amt < self.last_raise:
+                return False, (f'Cannot raise by {amt} chips, '
+                               f'less than {self.last_raise} min bet/raise')
 
         return True, ''
 

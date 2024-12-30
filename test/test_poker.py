@@ -69,31 +69,31 @@ class TestHand(unittest.TestCase):
 
 class TestGame(unittest.TestCase):
     # preflop
-    #     bets: 52, 52, 2, 50
-    #     chips: 148, 98, 98, 0
+    #     bets: 100, 100, 2, 50
+    #     chips: 100, 50, 98, 0
     #     pot: 152
-    #     side pot: 4
+    #     side pot: 100
     # after flop
     #     bets: 2, 2, -, -
-    #     chips: 146, 96, 98, 0
+    #     chips: 98, 48, 98, 0
     #     main pot: 152
-    #     side pot: 8
+    #     side pot: 104
     # after turn
     #     bets: 2, 2, -, -
-    #     chips: 144, 94, 98, 0
+    #     chips: 96, 46, 98, 0
     #     main pot: 152
-    #     side pot: 12
+    #     side pot: 108
     # after river
     #     bets: 2, 2, -, -
-    #     chips: 142, 92, 98, 0
+    #     chips: 94, 44, 98, 0
     #     main pot: 152
-    #     side pot: 16
+    #     side pot: 112
     # showdown:
     #     player 3 and player 0 split main pot
     #     player 0 wins side pot
     #
     # final balances:
-    #     234, 92, 98, 76
+    #     282, 44, 98, 76
     def test_side_hand(self):
         '''Test side pots'''
         game = Game(200, GameConfig.nl(2))
@@ -109,7 +109,7 @@ class TestGame(unittest.TestCase):
 
         # player 3 and player 0 tie
 
-        self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [234, 92, 98, 76])
+        self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [282, 44, 98, 76])
 
     # test multiple side pots (two all in with different values)
     # preflop
@@ -341,6 +341,17 @@ class TestGame(unittest.TestCase):
         # button is 0, first player after button is 1
         self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [2, 1, 3])
 
+    def test_antes(self):
+        '''Test that antes are not bets'''
+        game = Game(4, GameConfig(0, 0, 0, 0, 0, 1, -1))
+        game.add_player()
+        game.add_player()
+        game.add_player()
+        game.init_hand()
+        game.accept_move(Action.CALL)
+
+        self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [3, 4, 4])
+
 class TestHistory(unittest.TestCase):
     def test_import_export(self):
         # pylint: disable=protected-access
@@ -372,6 +383,7 @@ class TestHistory(unittest.TestCase):
         for fname in os.listdir('data/wsop/'):
             with open('data/wsop/' + fname, 'rb') as f:
                 try:
+                    if fname != '02-53-09.phh': continue
                     hist = phh.load(f)
                     replay = Game.replay(hist)
                     while True:

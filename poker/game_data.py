@@ -144,7 +144,6 @@ class Pot:
 
     def raised(self) -> int:
         '''The amount the pot has been raised'''
-        self.total_raised = max(self.total_raised, 0, *self.bets.values())
         return self.total_raised
 
     ### GETTERS ###

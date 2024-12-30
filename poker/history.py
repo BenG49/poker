@@ -92,15 +92,15 @@ class GameHistory:
 
     ### UTIL ###
 
-    def to_history_index(self, hand: int, idx: int) -> int:
+    def to_history_index(self, hand: int, game_idx: int) -> int:
         '''Convert from game index (seats) to history index (dealing order)'''
         # start is always 1 for the first hand
-        return (1 - hand + idx) % self.players
+        return (game_idx + hand - 1) % self.players
 
-    def to_game_index(self, hand: int, idx: int) -> int:
+    def to_game_index(self, hand: int, hist_idx: int) -> int:
         '''Convert from history index (dealing order) to game index (seats)'''
         # start is always 1 for the first hand
-        return (idx - 1 + hand) % self.players
+        return (hist_idx - hand + 1) % self.players
 
     def actions_by_hand(self) -> List[List[Optional[ActionEntry]]]:
         '''Split actions into actions per hand'''

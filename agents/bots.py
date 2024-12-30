@@ -9,7 +9,7 @@ from poker.hands import HandType
 from poker.util import Card, Deck, Rank, same
 
 class Raiser(Player):
-    '''Raises by min_raise every turn'''
+    '''Raises by min_raise every turn (or the minimum raise)'''
     def __init__(self, min_raise: int):
         super().__init__()
         self.min_raise = min_raise
@@ -17,7 +17,7 @@ class Raiser(Player):
     def move(self, game: Game) -> Move:
         if self.chips(game) - game.chips_to_call(self.id) <= self.min_raise:
             return Action.ALL_IN, None
-        return Action.RAISE, self.min_raise
+        return Action.RAISE, max(game.last_raise, self.min_raise)
 
 class Checker(Player):
     '''Checks/calls every turn'''
