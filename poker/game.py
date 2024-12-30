@@ -195,17 +195,14 @@ class Game:
 
     def end_round(self):
         '''Called at the end of a betting stage'''
-        # clear remaining bets into most up to date pot
-        split = self.pots[-1].split()
-        self.pots[-1].collect_bets()
-        while split is not None:
-            # move all players in last pot to new pot
-            for pl in self.pots[-1].players():
-                self.pl_data[pl].latest_pot += 1
-            self.pots.append(split)
-
-            split = self.pots[-1].split()
-            self.pots[-1].collect_bets()
+        # split pot into side pots
+        self.pots += self.pots[-1].split()
+        # collect bets
+        for pot in self.pots:
+            pot.collect_bets()
+        # update latest pot for all players in latest pot
+        for pl in self.pots[-1].players():
+            self.pl_data[pl].latest_pot = len(self.pots) - 1
 
         # give everyone one turn
         for pl in self.pl_data:

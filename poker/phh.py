@@ -15,6 +15,7 @@ from .util import Card, count, same
 class PHHParseError(ValueError):
     '''Error parsing .phh file'''
 
+# FIXME: all raises are raises TO, but bets (start of round) are not
 def load(file: BinaryIO) -> GameHistory:
     # pylint: disable=protected-access
     '''Construct GameHistory from .phh file.'''
@@ -22,15 +23,10 @@ def load(file: BinaryIO) -> GameHistory:
 
     if data['variant'] not in ('NT', 'FT'):
         raise PHHParseError('Game variant not supported!')
-    if any(a != 0 for a in data['antes']):
-        raise PHHParseError('Nonzero antes not supported!')
 
     fixed = data['variant'] == 'FT'
-
-    if not fixed and data['min_bet'] != 0:
-        raise NotImplementedError
-
     antes = data['antes']
+
     out = GameHistory(GameConfig(
         small_blind=data['blinds_or_straddles'][0],
         big_blind=data['blinds_or_straddles'][1],

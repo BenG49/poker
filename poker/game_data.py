@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Dict, Iterator, Optional, Tuple
+from typing import Dict, Iterator, List, Optional, Tuple
 
 from poker.util import same
 
@@ -88,6 +88,7 @@ class GameConfig:
     @staticmethod
     def nl(bb: int, min_bet: int=0) -> 'GameConfig':
         '''Create no-limit game'''
+        # TODO: make min_bet default to big blind -- will change all test cases
         return GameConfig(bb // 2, bb, 0, 0, min_bet)
 
     @staticmethod
@@ -164,26 +165,30 @@ class Pot:
         '''List of player ids in pot'''
         return self.bets.keys()
 
-    def split(self) -> Optional['Pot']:
+    def split(self) -> List['Pot']:
         '''
-        Splits pot into side pot if bets are not equal, which
-        assumes that the player with the minimum bet is all-in.
+        Splits pot into a number of side pots (including 0) if
+        this pot's bets are not equal, which assumes the player
+        with the lowest bet is all-in.
         Should be called at the end of the hand.
         '''
-        if same(self.bets.values()):
-            return None
+        out = [self]
 
-        max_stake = min(self.bets.values())
-        next_bets = {}
+        while not same(out[-1].bets.values()):
+            max_stake = min(out[-1].bets.values())
+            next_bets = {}
 
-        for pl_id, bet in self.bets.items():
-            if bet == max_stake:
-                continue
+            for pl_id, bet in out[-1].bets.items():
+                if bet == max_stake:
+                    continue
 
-            self.bets[pl_id] = max_stake
-            next_bets[pl_id] = bet - max_stake
+                out[-1].bets[pl_id] = max_stake
+                next_bets[pl_id] = bet - max_stake
 
-        return Pot(0, next_bets, max(0, *next_bets.values()))
+            out.append(Pot(0, next_bets, max(0, *next_bets.values())))
+
+        # exclude 'self' from list
+        return out[1:]
 
     def __repr__(self) -> str:
         return self.__str__()
