@@ -13,7 +13,7 @@ from poker.game_data import GameConfig
 
 CFR_GAME_CONFIG = {
     'buy_in': 2,
-    'cfg': GameConfig.nl(1),
+    'cfg': GameConfig.nl(1, 0),
 }
 
 def train_cfr():
@@ -33,7 +33,7 @@ def run_cfr_from_file():
 
 def tournament():
     boteval.run_tournament(
-        {'buy_in': 1000, 'cfg': GameConfig.nl(2)},
+        {'buy_in': 1000, 'cfg': GameConfig.nl(2, 0)},
         2_000,
         [
             [lambda: bots.Raiser(20),    'BB Raiser'],
@@ -47,7 +47,7 @@ def tournament():
     )
 
 def run_phh():
-    game = Game(1000, GameConfig.nl(20))
+    game = Game(1000, GameConfig.nl(20, 0))
     game.add_player(bots.HandValueBetter())
     game.add_player(bots.Checker())
     game.step_hand()
@@ -78,4 +78,5 @@ def load_hands():
                 print(f'{fname} FAILED:', e)
 
 if __name__ == '__main__':
+    tournament()
     load_hands()
