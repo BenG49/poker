@@ -438,7 +438,7 @@ class Game:
 
     def in_hand_players(self) -> Iterator[int]:
         ''''Iterator of player ids excluding players not in the current hand'''
-        for i, pl in self.pl_data:
+        for i, pl in enumerate(self.pl_data):
             if pl.state != PlayerState.OUT:
                 yield i
 
