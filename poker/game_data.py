@@ -86,10 +86,9 @@ class GameConfig:
     '''Stores configuration for fixed or no-limit hold'em game'''
 
     @staticmethod
-    def nl(bb: int, min_bet: int=0) -> 'GameConfig':
+    def nl(bb: int, min_bet: int=None) -> 'GameConfig':
         '''Create no-limit game'''
-        # TODO: make min_bet default to big blind -- will change all test cases
-        return GameConfig(bb // 2, bb, 0, 0, min_bet)
+        return GameConfig(bb // 2, bb, 0, 0, bb if min_bet is None else min_bet)
 
     @staticmethod
     def fl(bb: int) -> 'GameConfig':

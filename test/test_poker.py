@@ -96,7 +96,7 @@ class TestGame(unittest.TestCase):
     #     282, 44, 98, 76
     def test_side_hand(self):
         '''Test side pots'''
-        game = Game(200, GameConfig.nl(2))
+        game = Game(200, GameConfig.nl(2, 0))
         game.add_player(bots.Raiser(2))
         game.add_player(bots.Checker())
         game.pl_data[-1].chips = 150
@@ -125,7 +125,7 @@ class TestGame(unittest.TestCase):
     #     10, 20, 100
     def test_side_hands(self):
         '''Test multiple side pots'''
-        game = Game(100, GameConfig.nl(2))
+        game = Game(100, GameConfig.nl(2, 0))
         game.add_player(bots.AllIn())
         game.pl_data[-1].chips = 10
         game.add_player(bots.AllIn())
@@ -150,7 +150,7 @@ class TestGame(unittest.TestCase):
     #     20, 10, 100
     def test_side_hands2(self):
         '''Test side pots'''
-        game = Game(100, GameConfig.nl(2))
+        game = Game(100, GameConfig.nl(2, 0))
         game.add_player(bots.AllIn())
         game.pl_data[-1].chips = 20
         game.add_player(bots.AllIn())
@@ -163,7 +163,7 @@ class TestGame(unittest.TestCase):
 
     def test_all_fold(self):
         '''Test all players instantly folding'''
-        game = Game(100, GameConfig.nl(2))
+        game = Game(100, GameConfig.nl(2, 0))
         game.add_player(bots.Folder())
         game.add_player(bots.Folder())
         game.add_player(bots.Folder())
@@ -173,7 +173,7 @@ class TestGame(unittest.TestCase):
 
     def test_gen_nl_moves(self):
         '''Test move generation for No-limit Holdem games'''
-        game = Game(10, GameConfig.nl(2))
+        game = Game(10, GameConfig.nl(2, 0))
         game.add_player()
         game.add_player()
         game.init_hand()
@@ -190,7 +190,7 @@ class TestGame(unittest.TestCase):
             (Action.ALL_IN, None), # 9 chips
         ])
 
-        game = Game(2, GameConfig.nl(2))
+        game = Game(2, GameConfig.nl(2, 0))
         game.add_player()
         game.add_player()
         game.init_hand()
@@ -199,7 +199,7 @@ class TestGame(unittest.TestCase):
             (Action.CALL, None), # 1 chip
         ])
 
-        game = Game(3, GameConfig.nl(2))
+        game = Game(3, GameConfig.nl(2, 0))
         game.add_player()
         game.add_player()
         game.init_hand()
@@ -209,7 +209,7 @@ class TestGame(unittest.TestCase):
             (Action.ALL_IN, None), # 2 chips
         ])
 
-        game = Game(4, GameConfig.nl(2))
+        game = Game(4, GameConfig.nl(2, 0))
         game.add_player()
         game.add_player()
         game.init_hand()
@@ -220,7 +220,7 @@ class TestGame(unittest.TestCase):
             (Action.ALL_IN, None), # 3 chips
         ])
 
-        game = Game(6, GameConfig.nl(2))
+        game = Game(6, GameConfig.nl(2, 0))
         game.add_player()
         game.pl_data[-1].chips = 10
         game.add_player()
@@ -311,7 +311,7 @@ class TestGame(unittest.TestCase):
 
     def test_allin_blinds(self):
         '''Make sure all players call big blind even if big blind player has to go all in'''
-        game = Game(4, GameConfig.nl(2))
+        game = Game(4, GameConfig.nl(2, 0))
         game.add_player(bots.Checker()) # sb
         game.add_player(bots.Checker()) # bb
         game.pl_data[-1].chips = 1
@@ -324,7 +324,7 @@ class TestGame(unittest.TestCase):
         '''Test distributing odd chips'''
         # p1 puts one chip in and folds
         # p0 and p2 put two chips in and tie, odd chip
-        game = Game(2, GameConfig.nl(0))
+        game = Game(2, GameConfig.nl(0, 0))
         game.add_player()
         game.add_player()
         game.add_player()
