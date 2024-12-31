@@ -200,10 +200,14 @@ class Game:
         for pl in self.pots[-1].players():
             self.pl_data[pl].latest_pot = len(self.pots) - 1
 
+        to_move_count = 0
         # give everyone one turn
         for pl in self.pl_data:
             if pl.state == PlayerState.MOVED:
                 pl.state = PlayerState.TO_MOVE
+
+            if pl.state == PlayerState.TO_MOVE:
+                to_move_count += 1
 
         self.current_pl_id = self.next_player(self.bb_id)
 
@@ -212,8 +216,7 @@ class Game:
         self.last_raise = self.cfg.min_bet
 
         # check if only one player remaining or showdown
-        if count(self.pl_iter(include_states=(PlayerState.TO_MOVE,))) < 2 or \
-           self.betting_stage() == BettingStage.RIVER:
+        if to_move_count < 2 or self.betting_stage() == BettingStage.RIVER:
             self.end_hand()
 
         # deal next round
@@ -324,6 +327,7 @@ class Game:
 
     def get_moves(self, pl_id: int) -> List[Move]:
         '''Return all possible moves for player pl_id.'''
+        # TODO: convert to return iterator
         if not self.pl_data[pl_id].state.active() or not self.running():
             return []
 
@@ -432,38 +436,15 @@ class Game:
 
     ### ITERATORS ###
 
-    # TODO: get rid of ordered iterators for players, order is not used anywhere
-    def pl_iter(
-        self,
-        start=None,
-        reverse=False,
-        include_states=tuple(PlayerState),
-        exclude_states=(),
-    ) -> Iterator[int]:
-        '''
-        Iterator over player ids
+    def in_hand_players(self) -> Iterator[int]:
+        ''''Iterator of player ids excluding players not in the current hand'''
+        for i, pl in self.pl_data:
+            if pl.state != PlayerState.OUT:
+                yield i
 
-                 start: starting id, current_pl_id if None
-               reverse: moves clockwise if true
-        include_states: which states to include in iterator
-        exclude_states: which states to exclude in iterator
-        '''
-        start = self.current_pl_id if start is None else start
-        reverse = -1 if reverse else 1
-
-        for i in range(start, start + len(self._players) * reverse, reverse):
-            idx = i % len(self._players)
-            state = self.pl_data[idx].state
-            if state in include_states and state not in exclude_states:
-                yield idx
-
-    def in_hand_players(self, start=None, reverse=False) -> Iterator[int]:
-        ''''Wrapper for pl_iter excluding players not in the current hand'''
-        return self.pl_iter(start, reverse,exclude_states=(PlayerState.OUT,))
-
-    def not_folded_players(self, start=None, reverse=False) -> Iterator[int]:
-        '''Wrap pl_iter for players that have not folded'''
-        return self.pl_iter(start, reverse,exclude_states=(PlayerState.OUT, PlayerState.FOLDED))
+    def not_folded_players(self):
+        '''Return dict_iter of players that have not folded'''
+        return self.pots[0].players()
 
     ### PLAYER COUNTS ###
 
