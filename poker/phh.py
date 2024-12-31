@@ -8,14 +8,13 @@ from typing import BinaryIO
 from pip._vendor import tomli
 
 from . import hands
-from .game_data import Action, BettingStage, GameConfig
+from .game_data import Action, BettingStage, GameConfig, Pot
 from .history import ActionEntry, GameHistory, ResultEntry
-from .util import Card, count, same
+from .util import Card, count
 
 class PHHParseError(ValueError):
     '''Error parsing .phh file'''
 
-# FIXME: all raises are raises TO, but bets (start of round) are not
 def load(file: BinaryIO) -> GameHistory:
     # pylint: disable=protected-access
     '''Construct GameHistory from .phh file.'''
@@ -34,8 +33,7 @@ def load(file: BinaryIO) -> GameHistory:
         big_bet=data['big_bet'] if fixed else 0,
         min_bet=0 if fixed else data['min_bet'],
         ante_amt=max(antes),
-        # TODO: make this cover other cases
-        ante_idx=None if same(antes) else (-1 if antes[-1] == max(antes) else 1)
+        ante_idx=GameConfig.get_ante_idx(antes)
     ))
     out.hand_count = 1
     out.cards.append([])
@@ -45,9 +43,8 @@ def load(file: BinaryIO) -> GameHistory:
     if 'finishing_stacks' in data:
         out.chips.append(data['finishing_stacks'])
 
-    # keep track of pots for results
-    fold_chips = [0]
-    pots = [{p: min(out.cfg.big_blind, out.chips[0][p]) for p in range(out.players)}]
+    # keep track of pots for results, init pot with antes and blinds
+    pots = [Pot(sum(antes), dict(enumerate(data['blinds_or_straddles'])), out.cfg.big_blind)]
 
     stage_it = iter(BettingStage)
     stage = next(stage_it)
@@ -61,7 +58,9 @@ def load(file: BinaryIO) -> GameHistory:
             elif a_type == 'db':
                 card = Card.new(args[0])
                 out.cards[0].extend([card] if isinstance(card, Card) else card)
+
                 stage = next(stage_it)
+                pots[-1].collect_bets()
             else:
                 raise PHHParseError('Invalid dealer action!')
 
@@ -69,51 +68,44 @@ def load(file: BinaryIO) -> GameHistory:
 
         player = int(actor[1]) - 1
         if a_type == 'cbr':
-            pots[-1][player] = max(pots[-1].values()) + int(args[0])
+            bet = int(args[0]) - pots[-1].bets.get(player, 0)
+            amt_raised = bet - pots[-1].chips_to_call(player)
+            pots[-1].add(player, bet)
 
-            out.actions.append(ActionEntry(stage, player, (Action.RAISE, int(args[0]))))
+            out.actions.append(ActionEntry(stage, player, (Action.RAISE, amt_raised)))
         elif a_type == 'cc':
-            pots[-1][player] = max(pots[-1].values())
+            pots[-1].add(player, pots[-1].chips_to_call(player))
 
             out.actions.append(ActionEntry(stage, player, (Action.CALL, None)))
         elif a_type == 'f':
-            # move chips to folded pot
-            for i, p in enumerate(pots):
-                fold_chips[i] += p.pop(player, 0)
+            for pot in pots:
+                pot.fold(player)
 
             out.actions.append(ActionEntry(stage, player, (Action.FOLD, None)))
 
-    # split pot
-    while not same(pots[-1].values()):
-        max_bet = min(pots[-1].values())
-        pots.append({})
-        for pl, bet in pots[-2].items():
-            if bet > max_bet:
-                pots[-2][pl] = max_bet
-                pots[-1][pl] = bet - max_bet
-
+    # split pot into side pots
+    pots += pots[-1].split()
     out.end_hand()
 
     # one person + folded chips remaining
-    if count(pots[0].keys()) == 1:
-        winner = next(iter(pots[0].keys()))
+    if count(pots[0].players()) == 1:
         out.results[-1].append(ResultEntry(
-            sum(c + sum(p.values()) for c, p in zip(fold_chips, pots)),
-            [winner],
+            sum(pot.total() for pot in pots),
+            list(pots[0].players()),
             None
         ))
     # create rankings
     else:
         rankings = sorted([
             (i, hands.evaluate([*out.cards[0], *out._hands[0][i]]))
-            for i in pots[0].keys()
+            for i in pots[0].players()
         ], key=lambda x: x[1])
 
-        for c, p in zip(fold_chips, pots):
-            pot_rankings = [r for r in rankings if r[0] in p.keys()]
+        for pot in pots:
+            pot_rankings = [r for r in rankings if r[0] in pot.players()]
             winners = [p for p, h in pot_rankings if h == pot_rankings[0][1]]
             out.results[-1].append(ResultEntry(
-                c + sum(p.values()),
+                pot.total(),
                 winners,
                 pot_rankings[0][1]
             ))
@@ -130,17 +122,22 @@ def dump(history: GameHistory, hand: int=0) -> str:
 
     blinds = [history.cfg.small_blind, history.cfg.big_blind] + [0] * (history.players - 2)
     variant = 'FT' if history.cfg.is_limit() else 'NT'
-    bet_limits = (
-        f'small_bet = {history.cfg.small_bet}\nbig_bet = {history.cfg.big_bet}'
-        if history.cfg.is_limit() else
-        'min_bet = 0'
-    )
+    match history.cfg.ante_idx:
+        case 1:
+            antes = [0] + [history.cfg.ante_amt] + [0] * (history.players - 2)
+            if history.players == 2:
+                antes = antes[::-1]
+        case -1: antes = [0] * (history.players - 1) + [history.cfg.ante_amt]
+        case  _: antes = [history.cfg.ante_amt] * history.players
 
     out = (
         f'variant = "{variant}"\n'
-        f'antes = {[0] * history.players}\n'
+        f'antes = {antes}\n'
         f'blinds_or_straddles = {blinds}\n'
-        f'{bet_limits}\n'
+        # NOTE: includes both limits and min bet
+        f'small_bet = {history.cfg.small_bet}\n'
+        f'big_bet = {history.cfg.big_bet}\n'
+        f'min_bet = {history.cfg.min_bet}\n'
         f'starting_stacks = {history.chips[hand]}\n'
         f'seats = {history.players}\n'
         f'hand = {hand+1}\n'
@@ -150,14 +147,15 @@ def dump(history: GameHistory, hand: int=0) -> str:
     board = history.cards[hand]
 
     # showing holecards
-    folded = set(a.player for a in history.hand_actions(hand) if a.move[0] == Action.FOLD)
+    hand_a = history.hand_actions(hand)
+    folded = set(a.player for a in hand_a if a.move[0] == Action.FOLD)
     if len(folded) < history.players - 1:
-        _, flop, turn, river = history.actions_by_stage(hand)
-        showdown_stage = \
-            BettingStage.PREFLOP if len(flop) == 0 else \
-            BettingStage.FLOP if len(turn) == 0 else    \
-            BettingStage.TURN if len(river) == 0 else   \
-            BettingStage.RIVER
+        hand_a_stages = (a.stage if a is not None else None for a in hand_a)
+        showdown_stage = (
+            BettingStage.PREFLOP if BettingStage.FLOP not in hand_a_stages else
+            BettingStage.FLOP    if BettingStage.TURN not in hand_a_stages else
+            BettingStage.TURN    if BettingStage.RIVER not in hand_a_stages else
+            BettingStage.RIVER)
         showdown_string = ''.join(
             f'  "p{i+1} sm {history._hands[hand][i][0]}{history._hands[hand][i][1]}",\n'
             for i in range(history.players)
@@ -173,6 +171,8 @@ def dump(history: GameHistory, hand: int=0) -> str:
             # deal hands
             for i, hole in enumerate(history._hands[hand]):
                 out += f'  "d dh p{i+1} {hole[0]}{hole[1]}",\n'
+
+            bets = dict(enumerate(blinds))
         else:
             try:
                 if r == BettingStage.FLOP:
@@ -187,13 +187,19 @@ def dump(history: GameHistory, hand: int=0) -> str:
             out += f'  # {r.name}\n'
             out += f'  "d db {''.join(str(c) for c in cards)}",\n'
 
+            bets = {p: 0 for p in range(history.players)}
+
         for a in actions:
             if a.move[0] == Action.FOLD:
                 a_type = 'f'
+                bets[a.player] = 0
             elif a.move[0] == Action.CALL:
                 a_type = 'cc'
+                bets[a.player] = max(bets.values())
             else:
-                a_type = f'cbr {a.move[1]}'
+                raised_to = a.move[1] + max(bets.values())
+                a_type = f'cbr {raised_to}'
+                bets[a.player] = raised_to
 
             out += f'  "p{a.player+1} {a_type}",'
 

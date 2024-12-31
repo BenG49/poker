@@ -109,7 +109,7 @@ class TestGame(unittest.TestCase):
 
         # player 3 and player 0 tie
 
-        self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [282, 44, 98, 76])
+        self.assertEqual(game.chips(), [282, 44, 98, 76])
 
     # test multiple side pots (two all in with different values)
     # preflop
@@ -134,7 +134,7 @@ class TestGame(unittest.TestCase):
         random.seed(12)
         game.step_hand()
 
-        self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [10, 20, 100])
+        self.assertEqual(game.chips(), [10, 20, 100])
 
     # test bet higher than another player's chips, then all in
     # preflop
@@ -159,7 +159,7 @@ class TestGame(unittest.TestCase):
         random.seed(12)
         game.step_hand()
 
-        self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [20, 10, 100])
+        self.assertEqual(game.chips(), [20, 10, 100])
 
     def test_all_fold(self):
         '''Test all players instantly folding'''
@@ -169,7 +169,7 @@ class TestGame(unittest.TestCase):
         game.add_player(bots.Folder())
         game.step_hand()
 
-        self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [100, 99, 101])
+        self.assertEqual(game.chips(), [100, 99, 101])
 
     def test_gen_nl_moves(self):
         '''Test move generation for No-limit Holdem games'''
@@ -339,7 +339,7 @@ class TestGame(unittest.TestCase):
         game.accept_move(Action.CALL)
 
         # button is 0, first player after button is 1
-        self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [2, 1, 3])
+        self.assertEqual(game.chips(), [2, 1, 3])
 
     def test_antes(self):
         '''Test that antes are not bets'''
@@ -350,13 +350,13 @@ class TestGame(unittest.TestCase):
         game.init_hand()
         game.accept_move(Action.CALL)
 
-        self.assertEqual(list(map(lambda x: x.chips, game.pl_data)), [3, 4, 4])
+        self.assertEqual(game.chips(), [3, 4, 4])
 
 class TestHistory(unittest.TestCase):
     def test_import_export(self):
         # pylint: disable=protected-access
         '''Test exporting and importing game history as phh file'''
-        game = Game(1000, GameConfig.nl(20))
+        game = Game(1000, GameConfig(10, 20, 0, 0, 0, 1, -1))
         game.add_player(bots.HandValueBetter())
         game.add_player(bots.Checker())
         random.seed(12)
@@ -383,7 +383,6 @@ class TestHistory(unittest.TestCase):
         for fname in os.listdir('data/wsop/'):
             with open('data/wsop/' + fname, 'rb') as f:
                 try:
-                    if fname != '02-53-09.phh': continue
                     hist = phh.load(f)
                     replay = Game.replay(hist)
                     while True:
@@ -394,7 +393,7 @@ class TestHistory(unittest.TestCase):
 
                     # verify replayed chips if finishing_stacks was included in file
                     if len(hist.chips) > 1:
-                        self.assertTrue(hist.chips[1], list(p.chips for p in g.pl_data))
+                        self.assertTrue(hist.chips[1], g.chips())
                 except phh.PHHParseError as e:
                     print(f'{fname} FAILED:', e)
 

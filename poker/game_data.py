@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Dict, Iterator, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from poker.util import same
 
@@ -96,6 +96,20 @@ class GameConfig:
         '''Create fixed-limit game'''
         return GameConfig(bb // 2, bb, bb, bb * 2)
 
+    @staticmethod
+    def get_ante_idx(antes: List[int]) -> Optional[int]:
+        '''Converts from deal-ordered list of antes to index of which player(s) recieve ante'''
+        if same(antes):
+            return None
+
+        amt = max(antes)
+        for i in (-1, 1, 0):
+            if antes[i] == amt:
+                # blinds are reversed for heads-up game
+                if len(antes) == 2 and i >= 0:
+                    return (i + 1) % 2
+                return i
+
     # blinds
     small_blind: int
     big_blind: int
@@ -109,7 +123,8 @@ class GameConfig:
 
     # antes
     ante_amt: int = 0
-    # None for antes for everyone, 1 for big blind ante, -1 for button ante
+    # None for antes for everyone, int selects player by deal order
+    # e.g.: 0 small blind ante, 1 big blind ante, -1 button ante
     ante_idx: Optional[int] = None
 
     def has_blinds(self) -> bool:
@@ -161,7 +176,7 @@ class Pot:
         '''Minimum amount required to call'''
         return self.raised() - self.bets.get(pl_id, 0)
 
-    def players(self) -> Iterator[int]:
+    def players(self):
         '''List of player ids in pot'''
         return self.bets.keys()
 

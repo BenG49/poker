@@ -83,30 +83,25 @@ class Game:
 
     def init_hand(self):
         '''Initializes a new hand'''
-        for pl in self.pl_data:
-            pl.reset_state()
-
         if count(self.in_hand_players()) < 2:
             self.state = GameState.OVER
             return
         self.state = GameState.RUNNING
 
-        self.pots = [Pot(0, {}, 0)]
+        for pl in self.pl_data:
+            pl.reset_state()
 
         # add all players to pot in case game instantly ends
-        for pl in self.in_hand_players():
-            self.__bet(pl, 0)
+        self.pots = [Pot(0, {p: 0 for p in self.in_hand_players()}, 0)]
 
         # deal hands
         self.community = []
-        for pl in self._players:
-            pl.hand = []
         self._deck.shuffle()
         for p in self._players:
             p.hand = tuple(self._deck.deal(2))
 
         self.history.init_hand(
-            [pl.chips for pl in self.pl_data],
+            self.chips(),
             [pl.hand for pl in self._players]
         )
 
@@ -156,7 +151,8 @@ class Game:
             bet = None
             match action:
                 case Action.FOLD:
-                    self.current_pl_pot.fold(self.current_pl_id)
+                    for pot in self.pots:
+                        pot.fold(self.current_pl_id)
                     self.current_pl_data.state = PlayerState.FOLDED
                 case Action.CALL:
                     bet = min(
@@ -175,9 +171,9 @@ class Game:
                         self.raises_left -= 1
 
             if bet is not None:
+                # make everyone else call this raise
                 if bet > self.chips_to_call(self.current_pl_id):
                     self.last_raise = bet - self.chips_to_call(self.current_pl_id)
-                    # make everyone else call this raise
                     for i, pl in enumerate(self.pl_data):
                         if i == self.current_pl_id:
                             continue
@@ -189,8 +185,8 @@ class Game:
 
         self.current_pl_id = self.next_player()
 
-        if (PlayerState.TO_MOVE not in map(lambda p: p.state, self.pl_data)) or \
-           self.not_folded_count() == 1:
+        player_states = map(lambda p: p.state, self.pl_data)
+        if PlayerState.TO_MOVE not in player_states or self.not_folded_count() == 1:
             self.end_round()
 
     def end_round(self):
@@ -216,7 +212,7 @@ class Game:
         self.last_raise = self.cfg.min_bet
 
         # check if only one player remaining or showdown
-        if count(self.pl_iter(include_states=(PlayerState.MOVED, PlayerState.TO_MOVE))) < 2 or \
+        if count(self.pl_iter(include_states=(PlayerState.TO_MOVE,))) < 2 or \
            self.betting_stage() == BettingStage.RIVER:
             self.end_hand()
 
@@ -231,12 +227,12 @@ class Game:
 
         # hand was ended before river, make the one person left win
         if self.not_folded_count() < 2:
-            winner = [i for i, p in enumerate(self.pl_data) if p.state != PlayerState.FOLDED][0]
+            winners = list(self.pots[0].players())
             total = sum(p.total() for p in self.pots)
 
-            self.history.add_result(total, [winner], None)
+            self.history.add_result(total, winners, None)
 
-            self.pl_data[winner].chips += total
+            self.pl_data[winners[0]].chips += total
         else:
             # if hand was ended before river, deal rest of community
             while len(self.community) < 5:
@@ -290,6 +286,10 @@ class Game:
         '''Getter for the pot the current player is in'''
         return self.pots[self.current_pl_data.latest_pot]
 
+    def chips(self) -> List[int]:
+        '''List of chips for players'''
+        return [p.chips for p in self.pl_data]
+
     def chips_to_call(self, pl_id: int) -> int:
         '''Helper for chips to call for player'''
         if self.pl_data[pl_id].state.active():
@@ -336,6 +336,7 @@ class Game:
             out.append((Action.CALL, None))
         else:
             out.append((Action.CALL, None))
+            # TODO: cleanup
             if self.cfg.is_limit():
                 raise_amt = self.get_current_limit()
                 # raise to complete limit if current raise is small
@@ -361,6 +362,7 @@ class Game:
 
     def translate_move(self, pl_id: int, action: Action, amt: int) -> Move:
         '''Translate move into standard move format'''
+        # TODO: cleanup
         if action == Action.RAISE:
             if amt is None and self.cfg.is_limit():
                 amt = self.get_current_limit()
@@ -384,7 +386,7 @@ class Game:
         '''Validate move, throw InvalidMoveError if throws is True and move is invalid'''
         action, amt = self.translate_move(pl_id, action, amt)
         if amt is not None and amt < 0:
-            return False, 'Positive value is required for amt.'
+            return False, f'P{pl_id}: Positive value is required for amt.'
 
         if self.pl_data[pl_id].state != PlayerState.TO_MOVE:
             return False, f'Player {pl_id} has state {self.pl_data[pl_id].state.name}, cannot move.'
@@ -393,24 +395,25 @@ class Game:
         if (action == Action.RAISE or
                (action == Action.ALL_IN and amt >= self.get_current_limit() / 2)) and \
            at_bet_limit:
-            return False, 'Cannot raise more than 5 times per round.'
+            return False, f'P{pl_id}: Cannot raise more than 5 times per round.'
 
         chips = self.pl_data[pl_id].chips
         to_call = self.chips_to_call(pl_id)
 
         if action == Action.CALL and chips < to_call:
-            return False, f'Cannot call {to_call} chips, more than available {chips} chips'
+            return False, (f'P{pl_id}: Cannot call {to_call} chips, '
+                           f'more than available {chips} chips')
 
         if action == Action.RAISE:
             if amt is None or amt < 0:
-                return False, 'Expected positive value for move RAISE.'
+                return False, f'P{pl_id}: Expected positive value for move RAISE.'
 
             if chips < to_call + amt:
-                return False, (f'Cannot raise by {to_call + amt} chips, '
+                return False, (f'P{pl_id}: Cannot push in {to_call + amt} chips, '
                                f'more than available {chips} chips')
 
             if amt < self.last_raise:
-                return False, (f'Cannot raise by {amt} chips, '
+                return False, (f'P{pl_id}: Cannot raise by {amt} chips, '
                                f'less than {self.last_raise} min bet/raise')
 
         return True, ''
@@ -429,6 +432,7 @@ class Game:
 
     ### ITERATORS ###
 
+    # TODO: get rid of ordered iterators for players, order is not used anywhere
     def pl_iter(
         self,
         start=None,
@@ -465,11 +469,7 @@ class Game:
 
     def not_folded_count(self) -> int:
         '''Counts # of players in game that haven't folded'''
-        n = 0
-        for pl in self.pl_data:
-            if pl.state not in (PlayerState.FOLDED, PlayerState.OUT):
-                n += 1
-        return n
+        return len(self.pots[0].players())
 
     ### MODIFIERS ###
 
@@ -486,6 +486,6 @@ class Game:
     def __str__(self) -> str:
         return (
             f'(P{self.current_pl_id} to move, {self.community}, '
-            f'{list(p.hand for p in self._players)}, {self.pots}, '
-            f'{list(p.chips for p in self.pl_data)})'
+            f'{[p.hand for p in self._players]}, {self.pots}, '
+            f'{self.chips()})'
         )
