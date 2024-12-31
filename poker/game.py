@@ -364,21 +364,21 @@ class Game:
 
     def translate_move(self, pl_id: int, action: Action, amt: int) -> Move:
         '''Translate move into standard move format'''
-        # TODO: cleanup
         if action == Action.RAISE:
+            # autofill raise amount for FL game
             if amt is None and self.cfg.is_limit():
                 amt = self.get_current_limit()
-                # raise to complete limit if current raise is small
+                # complete the bet if current raise is small
                 if self.chips_to_call(pl_id) < self.get_current_limit() / 2:
                     amt -= self.chips_to_call(pl_id)
+
             if amt + self.chips_to_call(pl_id) == self.pl_data[pl_id].chips:
-                action = Action.ALL_IN
-            elif amt == 0:
-                action = Action.CALL
-                amt = None
+                return Action.ALL_IN, amt
+            if amt == 0:
+                return Action.CALL, None
 
         if action == Action.ALL_IN:
-            amt = self.pl_data[pl_id].chips
+            return Action.ALL_IN, self.pl_data[pl_id].chips
 
         return action, amt
 
