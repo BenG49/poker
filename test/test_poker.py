@@ -177,7 +177,7 @@ class TestGame(unittest.TestCase):
         game.add_player()
         game.add_player()
         game.init_hand()
-        self.assertEqual(game.get_moves(0), [
+        self.assertSetEqual(set(game.get_moves(0)), set([
             (Action.FOLD, None),
             (Action.CALL, None),   # 1 chip
             (Action.RAISE, 1),     # 2 chips
@@ -188,37 +188,37 @@ class TestGame(unittest.TestCase):
             (Action.RAISE, 6),     # 7 chips
             (Action.RAISE, 7),     # 8 chips
             (Action.ALL_IN, None), # 9 chips
-        ])
+        ]))
 
         game = Game(2, GameConfig.nl(2, 0))
         game.add_player()
         game.add_player()
         game.init_hand()
-        self.assertEqual(game.get_moves(0), [
+        self.assertSetEqual(set(game.get_moves(0)), set([
             (Action.FOLD, None),
             (Action.CALL, None), # 1 chip
-        ])
+        ]))
 
         game = Game(3, GameConfig.nl(2, 0))
         game.add_player()
         game.add_player()
         game.init_hand()
-        self.assertEqual(game.get_moves(0), [
+        self.assertSetEqual(set(game.get_moves(0)), set([
             (Action.FOLD, None),
             (Action.CALL, None),   # 1 chip
             (Action.ALL_IN, None), # 2 chips
-        ])
+        ]))
 
         game = Game(4, GameConfig.nl(2, 0))
         game.add_player()
         game.add_player()
         game.init_hand()
-        self.assertEqual(game.get_moves(0), [
+        self.assertSetEqual(set(game.get_moves(0)), set([
             (Action.FOLD, None),
             (Action.CALL, None),   # 1 chip
             (Action.RAISE, 1),     # 2 chips
             (Action.ALL_IN, None), # 3 chips
-        ])
+        ]))
 
         game = Game(6, GameConfig.nl(2, 0))
         game.add_player()
@@ -226,10 +226,10 @@ class TestGame(unittest.TestCase):
         game.add_player()
         game.init_hand()
         game.accept_move(Action.ALL_IN)
-        self.assertEqual(game.get_moves(1), [
+        self.assertSetEqual(set(game.get_moves(1)), set([
             (Action.FOLD, None),
             (Action.ALL_IN, None),
-        ])
+        ]))
 
     def test_gen_fl_moves(self):
         '''Test move generation for Fixed-limit Holdem games'''
@@ -239,11 +239,11 @@ class TestGame(unittest.TestCase):
         game.add_player()
         game.add_player()
         game.init_hand()
-        self.assertEqual(game.get_moves(0), [
+        self.assertSetEqual(set(game.get_moves(0)), set([
             (Action.FOLD, None),
             (Action.CALL, None),
             (Action.RAISE, 4)
-        ])
+        ]))
 
         # all in == fixed limit raise
         game = Game(8, cfg)
@@ -251,11 +251,11 @@ class TestGame(unittest.TestCase):
         game.add_player()
         game.init_hand()
         game.accept_move(Action.RAISE, 4)
-        self.assertEqual(game.get_moves(1), [
+        self.assertSetEqual(set(game.get_moves(1)), set([
             (Action.FOLD, None),
             (Action.CALL, None),  # 4 chips
             (Action.ALL_IN, None) # 8 chips
-        ])
+        ]))
 
         # all in == fixed limit raise
         game = Game(8, cfg)
@@ -263,11 +263,11 @@ class TestGame(unittest.TestCase):
         game.add_player()
         game.init_hand()
         game.accept_move(Action.RAISE, 4)
-        self.assertEqual(game.get_moves(1), [
+        self.assertSetEqual(set(game.get_moves(1)), set([
             (Action.FOLD, None),
             (Action.CALL, None),  # 4 chips
             (Action.ALL_IN, None) # 8 chips
-        ])
+        ]))
 
         # lots of all ins
         game = Game(4, cfg)
@@ -275,10 +275,10 @@ class TestGame(unittest.TestCase):
         game.add_player()
         game.init_hand()
         game.accept_move(Action.ALL_IN)
-        self.assertEqual(game.get_moves(1), [
+        self.assertSetEqual(set(game.get_moves(1)), set([
             (Action.FOLD, None),
             (Action.CALL, None),
-        ])
+        ]))
 
         # complete all in
         game = Game(8, cfg)
@@ -287,11 +287,11 @@ class TestGame(unittest.TestCase):
         game.add_player()
         game.init_hand()
         game.accept_move(Action.ALL_IN)
-        self.assertEqual(game.get_moves(1), [
+        self.assertSetEqual(set(game.get_moves(1)), set([
             (Action.FOLD, None),
             (Action.CALL, None), # 2 chips
             (Action.RAISE, 4)    # 6 chips
-        ])
+        ]))
 
         # raise limits
         game = Game(8, GameConfig(0, 0, 1, 2))
@@ -304,10 +304,10 @@ class TestGame(unittest.TestCase):
         game.accept_move(Action.RAISE, 1) # P2
         game.accept_move(Action.RAISE, 1) # P0
         game.accept_move(Action.RAISE, 1) # P1
-        self.assertEqual(game.get_moves(2), [
+        self.assertSetEqual(set(game.get_moves(2)), set([
             (Action.FOLD, None),
             (Action.CALL, None),
-        ])
+        ]))
 
     def test_allin_blinds(self):
         '''Make sure all players call big blind even if big blind player has to go all in'''

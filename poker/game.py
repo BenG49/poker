@@ -325,44 +325,42 @@ class Game:
             return None
         return raise_to - current_raise
 
-    def get_moves(self, pl_id: int) -> List[Move]:
-        '''Return all possible moves for player pl_id.'''
-        # TODO: convert to return iterator
+    def get_moves(self, pl_id: int) -> Iterator[Move]:
+        '''Iterator over all possible moves for player pl_id.'''
         if not self.pl_data[pl_id].state.active() or not self.running():
-            return []
+            return
 
-        out = [(Action.FOLD, None)]
+        yield Action.FOLD, None
 
-        free_chips = self.pl_data[pl_id].chips - self.chips_to_call(pl_id)
+        to_call = self.chips_to_call(pl_id)
+        free_chips = self.pl_data[pl_id].chips - to_call
         if free_chips < 0:
-            out.append((Action.ALL_IN, None))
+            yield Action.ALL_IN, None
         elif free_chips == 0:
-            out.append((Action.CALL, None))
+            yield Action.CALL, None
         else:
-            out.append((Action.CALL, None))
-            # TODO: cleanup
+            yield Action.CALL, None
+
             if self.cfg.is_limit():
                 raise_amt = self.get_current_limit()
                 # raise to complete limit if current raise is small
-                if self.chips_to_call(pl_id) < self.get_current_limit() / 2:
-                    raise_amt -= self.chips_to_call(pl_id)
+                if to_call < self.get_current_limit() / 2:
+                    raise_amt -= to_call
 
                 # if raise allowed
                 if len(self._players) == 2 or self.raises_left > 0:
                     if free_chips <= raise_amt:
-                        out.append((Action.ALL_IN, None))
+                        yield Action.ALL_IN, None
                     else:
-                        out.append((Action.RAISE, raise_amt))
+                        yield Action.RAISE, raise_amt
 
                 # all-in that doesn't count as a raise
                 elif free_chips < self.get_current_limit() / 2:
-                    out.append((Action.ALL_IN, None))
+                    yield Action.ALL_IN, None
             else:
                 # no-limit
-                out.extend([(Action.RAISE, i) for i in range(max(1, self.last_raise), free_chips)])
-                out.append((Action.ALL_IN, None))
-
-        return out
+                yield from ((Action.RAISE, i) for i in range(max(1, self.last_raise), free_chips))
+                yield Action.ALL_IN, None
 
     def translate_move(self, pl_id: int, action: Action, amt: int) -> Move:
         '''Translate move into standard move format'''
