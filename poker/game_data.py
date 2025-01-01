@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Set, Tuple
 
 from poker.util import same
 
@@ -135,86 +135,121 @@ class GameConfig:
         return self.small_bet > 0 or self.big_bet > 0
 
 @dataclass
-class Pot:
-    '''Represent the pot or a side pot'''
-
-    # chips in pot from previous betting stages
+class _PrevPot:
+    '''Stores data for past pot, after pot has been split'''
     chips: int
-    # bets in pot from current round { pl_id: chips }
-    bets: Dict[int, int]
-    # amount raised (usually max bet)
-    total_raised: int
+    players_: set
 
-    ### MODIFIERS ###
-    def fold(self, pl_id: int):
-        '''Fold pl_id'''
-        self.chips += self.bets.pop(pl_id, 0)
+    def players(self) -> Set[int]:
+        '''Set of player ids in pot'''
+        return self.players_
 
-    def collect_bets(self):
-        '''Put all bets in main pot'''
-        self.total_raised = 0
-        for key, val in self.bets.items():
-            self.chips += val
-            self.bets[key] = 0
-
-    def raised(self) -> int:
-        '''The amount the pot has been raised'''
-        return self.total_raised
-
-    ### GETTERS ###
     def total(self) -> int:
-        '''Total chips in pot from all hands'''
-        return self.chips + sum(self.bets.values())
+        '''Total chips in pot'''
+        return self.chips
 
-    def add(self, pl_id: int, chips: int):
-        '''Add chips to pl_id's bet'''
-        self.bets[pl_id] = chips + self.bets.get(pl_id, 0)
-        self.total_raised = max(self.total_raised, self.bets[pl_id])
+    def fold(self, pl_id: int):
+        '''Remove player from pot'''
+        self.players_.remove(pl_id)
+
+    def __repr__(self) -> str:
+        return self.__str__()
+    def __str__(self) -> str:
+        p = ', '.join(f'P{p}' for p in self.players())
+        return f'(${self.chips} {p})'
+
+class Pots:
+    '''Represent the current pot and all previous pots'''
+    def __init__(self, players=None):
+        if players is None:
+            players = []
+
+        self.raised = 0
+        self.chips = 0
+        self.bets = dict.fromkeys(players, 0)
+        self.prev_pots: List[_PrevPot] = []
 
     def chips_to_call(self, pl_id: int) -> int:
-        '''Minimum amount required to call'''
-        return self.raised() - self.bets.get(pl_id, 0)
+        '''Minimum amount required to call for player'''
+        return self.raised - self.bets.get(pl_id, 0)
 
-    def players(self):
-        '''List of player ids in pot'''
+    def players(self) -> Set[int]:
+        '''Set of player ids in pot'''
         return self.bets.keys()
 
-    def split(self) -> List['Pot']:
+    def not_folded_players(self) -> Set[int]:
+        '''Which players have not folded'''
+        if len(self.prev_pots) > 0:
+            return self.prev_pots[0].players()
+
+        return self.players()
+
+    def total(self) -> int:
+        '''Total chips in pot and bets'''
+        return self.chips + sum(self.bets.values())
+
+    def total_all_pots(self) -> int:
+        '''Total chips in ALL pots'''
+        return self.total() + sum(pot.chips for pot in self.prev_pots)
+
+    def bet(self, pl_id: int, chips: int):
+        '''Add chips to pl_id's bet'''
+        self.bets[pl_id] = chips + self.bets.get(pl_id, 0)
+        self.raised = max(self.raised, self.bets[pl_id])
+
+    def collect_bets(self):
+        '''Put all bets in center'''
+        self.raised = 0
+        for p, bet in self.bets.items():
+            self.chips += bet
+            self.bets[p] = 0
+
+    def fold(self, pl_id: int):
+        '''Remove player from ALL pots, collect their bets'''
+        self.chips += self.bets.get(pl_id, 0)
+        self.bets.pop(pl_id)
+        for pot in self.prev_pots:
+            pot.fold(pl_id)
+
+    def split(self):
         '''
-        Splits pot into a number of side pots (including 0) if
-        this pot's bets are not equal, which assumes the player
-        with the lowest bet is all-in.
+        Splits pot into a number of side pots if this pot's bets
+        are not equal, which assumes the player with the lowest
+        bet is all-in.
         Should be called at the end of the hand.
         '''
-        out = [self]
+        while not same(self.bets.values()):
+            max_stake = min(self.bets.values())
+            split = _PrevPot(0, set(self.players()))
+            split.chips = max_stake * len(split.players()) + self.chips
 
-        while not same(out[-1].bets.values()):
-            max_stake = min(out[-1].bets.values())
-            next_bets = {}
-
-            for pl_id, bet in out[-1].bets.items():
+            for p, bet in list(self.bets.items()):
                 if bet == max_stake:
+                    self.bets.pop(p)
                     continue
 
-                out[-1].bets[pl_id] = max_stake
-                next_bets[pl_id] = bet - max_stake
+                self.bets[p] -= max_stake
 
-            out.append(Pot(0, next_bets, max(0, *next_bets.values())))
+            self.raised = max(self.bets.values())
+            self.chips = 0
+            self.prev_pots.append(split)
 
-        # exclude 'self' from list
-        return out[1:]
+    def __iter__(self):
+        '''Iterate over all pots'''
+        yield from self.prev_pots
+        yield self
 
     def __repr__(self) -> str:
         return self.__str__()
     def __str__(self) -> str:
         bets = ', '.join(f'P{p}:${b}' for p, b in sorted(self.bets.items()))
-        return f'(${self.chips}{" " if bets else ""}{bets})'
+        out = f'(${self.chips}{" " if bets else ""}{bets})'
+        return ', '.join([out, *(str(p) for p in reversed(self.prev_pots))])
 
 @dataclass
 class PlayerData:
     '''Public player data'''
     chips: int
-    latest_pot: int
     state: PlayerState
 
     def reset_state(self):
@@ -223,8 +258,6 @@ class PlayerData:
             self.state = PlayerState.OUT
         else:
             self.state = PlayerState.TO_MOVE
-
-        self.latest_pot = 0
 
 
 Move = Tuple[Action, Optional[int]]

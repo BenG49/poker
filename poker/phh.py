@@ -8,9 +8,9 @@ from typing import BinaryIO
 from pip._vendor import tomli
 
 from . import hands
-from .game_data import Action, BettingStage, GameConfig, Pot
+from .game_data import Action, BettingStage, GameConfig, Pots
 from .history import ActionEntry, GameHistory, ResultEntry
-from .util import Card, count
+from .util import Card
 
 class PHHParseError(ValueError):
     '''Error parsing .phh file'''
@@ -44,7 +44,10 @@ def load(file: BinaryIO) -> GameHistory:
         out.chips.append(data['finishing_stacks'])
 
     # keep track of pots for results, init pot with antes and blinds
-    pots = [Pot(sum(antes), dict(enumerate(data['blinds_or_straddles'])), out.cfg.big_blind)]
+    pots = Pots()
+    pots.chips = sum(antes)
+    pots.bets = dict(enumerate(data['blinds_or_straddles']))
+    pots.raised = out.cfg.big_blind
 
     stage_it = iter(BettingStage)
     stage = next(stage_it)
@@ -60,7 +63,7 @@ def load(file: BinaryIO) -> GameHistory:
                 out.cards[0].extend([card] if isinstance(card, Card) else card)
 
                 stage = next(stage_it)
-                pots[-1].collect_bets()
+                pots.collect_bets()
             else:
                 raise PHHParseError('Invalid dealer action!')
 
@@ -68,37 +71,37 @@ def load(file: BinaryIO) -> GameHistory:
 
         player = int(actor[1]) - 1
         if a_type == 'cbr':
-            bet = int(args[0]) - pots[-1].bets.get(player, 0)
-            amt_raised = bet - pots[-1].chips_to_call(player)
-            pots[-1].add(player, bet)
+            bet = int(args[0]) - pots.bets.get(player, 0)
+            amt_raised = bet - pots.chips_to_call(player)
+            pots.bet(player, bet)
 
             out.actions.append(ActionEntry(stage, player, (Action.RAISE, amt_raised)))
         elif a_type == 'cc':
-            pots[-1].add(player, pots[-1].chips_to_call(player))
+            pots.bet(player, pots.chips_to_call(player))
 
             out.actions.append(ActionEntry(stage, player, (Action.CALL, None)))
         elif a_type == 'f':
-            for pot in pots:
-                pot.fold(player)
+            pots.fold(player)
 
             out.actions.append(ActionEntry(stage, player, (Action.FOLD, None)))
 
     # split pot into side pots
-    pots += pots[-1].split()
+    pots.split()
+    pots.collect_bets()
     out.end_hand()
 
     # one person + folded chips remaining
-    if count(pots[0].players()) == 1:
+    if len(pots.not_folded_players()) == 1:
         out.results[-1].append(ResultEntry(
-            sum(pot.total() for pot in pots),
-            list(pots[0].players()),
+            pots.total_all_pots(),
+            list(pots.not_folded_players()),
             None
         ))
     # create rankings
     else:
         rankings = sorted([
             (i, hands.evaluate([*out.cards[0], *out._hands[0][i]]))
-            for i in pots[0].players()
+            for i in pots.not_folded_players()
         ], key=lambda x: x[1])
 
         for pot in pots:
@@ -187,7 +190,7 @@ def dump(history: GameHistory, hand: int=0) -> str:
             out += f'  # {r.name}\n'
             out += f'  "d db {''.join(str(c) for c in cards)}",\n'
 
-            bets = {p: 0 for p in range(history.players)}
+            bets = dict.fromkeys(range(history.players), 0)
 
         for a in actions:
             if a.move[0] == Action.FOLD:

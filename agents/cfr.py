@@ -193,8 +193,8 @@ class InfoSet:
         self.key = key
         self.player = player
         self._actions = _actions
-        self.regrets = {a: 0. for a in self.actions()}
-        self.strategy_sum = {a: 0. for a in self.actions()}
+        self.regrets = dict.fromkeys(self.actions(), 0)
+        self.strategy_sum = dict.fromkeys(self.actions(), 0)
         self.strategy = {}
         self.calculate_strategy()
 

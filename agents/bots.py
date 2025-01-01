@@ -147,7 +147,7 @@ class HandValueBetter(Player):
             return Action.FOLD, None
 
         pot_pct = value / (2 * card_value(Card(Rank.ACE, 0)))
-        result = int(game.current_pl_pot.total() * pot_pct)
+        result = int(game.pots.total() * pot_pct)
         raise_amt = game.raise_to(self.id, result)
         if raise_amt is None:
             return Action.FOLD, None

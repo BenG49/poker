@@ -6,7 +6,7 @@ from typing import Iterator, List, Optional
 from . import hands
 from .game_data import (
     Action, BettingStage, EmptyPlayer, GameConfig, GameState, InvalidMoveError, Move, Player,
-    PlayerData, PlayerState, Pot
+    PlayerData, PlayerState, Pots
 )
 from .history import GameHistory
 from .util import Card, Deck, check_throw, count
@@ -67,7 +67,7 @@ class Game:
 
         self.pl_data: List[PlayerData] = []
         self.community: List[Card] = []
-        self.pots: List[Pot] = [Pot(0, {}, 0)]
+        self.pots = None
 
         self.history: GameHistory = GameHistory(self.cfg)
 
@@ -79,7 +79,7 @@ class Game:
         # bets over limit should be validated beforehand, makes blinds simpler
         chips = min(chips, self.pl_data[pl_id].chips)
         self.pl_data[pl_id].chips -= chips
-        self.pots[self.pl_data[pl_id].latest_pot].add(pl_id, chips)
+        self.pots.bet(pl_id, chips)
 
     def init_hand(self):
         '''Initializes a new hand'''
@@ -91,8 +91,7 @@ class Game:
         for pl in self.pl_data:
             pl.reset_state()
 
-        # add all players to pot in case game instantly ends
-        self.pots = [Pot(0, {p: 0 for p in self.in_hand_players()}, 0)]
+        self.pots = Pots(self.in_hand_players())
 
         # deal hands
         self.community = []
@@ -126,10 +125,10 @@ class Game:
                 # antes go into main pot chips, not bets
                 chips = min(self.cfg.ante_amt, self.pl_data[i].chips)
                 self.pl_data[i].chips -= chips
-                self.pots[self.pl_data[i].latest_pot].chips += chips
+                self.pots.chips += chips
 
         # no matter what, rest of players have to match big blind raise
-        self.pots[-1].total_raised = self.cfg.big_blind
+        self.pots.raised = self.cfg.big_blind
 
         # reset number of raises allowed this round
         self.raises_left = 5
@@ -192,13 +191,8 @@ class Game:
     def end_round(self):
         '''Called at the end of a betting stage'''
         # split pot into side pots
-        self.pots += self.pots[-1].split()
-        # collect bets
-        for pot in self.pots:
-            pot.collect_bets()
-        # update latest pot for all players in latest pot
-        for pl in self.pots[-1].players():
-            self.pl_data[pl].latest_pot = len(self.pots) - 1
+        self.pots.split()
+        self.pots.collect_bets()
 
         to_move_count = 0
         # give everyone one turn
@@ -230,11 +224,10 @@ class Game:
 
         # hand was ended before river, make the one person left win
         if self.not_folded_count() < 2:
-            winners = list(self.pots[0].players())
-            total = sum(p.total() for p in self.pots)
+            winners = list(self.pots.players())
+            total = self.pots.total_all_pots()
 
             self.history.add_result(total, winners, None)
-
             self.pl_data[winners[0]].chips += total
         else:
             # if hand was ended before river, deal rest of community
@@ -244,7 +237,7 @@ class Game:
 
             rankings = sorted([
                 (i, hands.evaluate([*self.community, *self._players[i].hand]))
-                for i in self.not_folded_players()
+                for i in self.pots.not_folded_players()
             ], key=lambda x: x[1])
 
             for pot in self.pots:
@@ -267,7 +260,7 @@ class Game:
                     self.pl_data[i].chips += remainder
 
         # clear pots
-        self.pots = [Pot(0, {}, 0)]
+        self.pots = None
         self.button_id = self.next_player(self.button_id, reverse=True)
         self.state = GameState.HAND_DONE
 
@@ -284,11 +277,6 @@ class Game:
         '''Getter for current player's data'''
         return self.pl_data[self.current_pl_id]
 
-    @property
-    def current_pl_pot(self) -> Pot:
-        '''Getter for the pot the current player is in'''
-        return self.pots[self.current_pl_data.latest_pot]
-
     def chips(self) -> List[int]:
         '''List of chips for players'''
         return [p.chips for p in self.pl_data]
@@ -296,7 +284,7 @@ class Game:
     def chips_to_call(self, pl_id: int) -> int:
         '''Helper for chips to call for player'''
         if self.pl_data[pl_id].state.active():
-            return self.pots[self.pl_data[pl_id].latest_pot].chips_to_call(pl_id)
+            return self.pots.chips_to_call(pl_id)
         return 0
 
     def running(self) -> bool:
@@ -440,15 +428,11 @@ class Game:
             if pl.state != PlayerState.OUT:
                 yield i
 
-    def not_folded_players(self):
-        '''Return dict_iter of players that have not folded'''
-        return self.pots[0].players()
-
     ### PLAYER COUNTS ###
 
     def not_folded_count(self) -> int:
         '''Counts # of players in game that haven't folded'''
-        return len(self.pots[0].players())
+        return len(self.pots.not_folded_players())
 
     ### MODIFIERS ###
 
@@ -457,14 +441,9 @@ class Game:
         player.id = len(self._players)
         self.pl_data.append(PlayerData(
             chips=self.buy_in,
-            latest_pot=len(self.pots) - 1,
             state=PlayerState.TO_MOVE)
         )
         self._players.append(player)
 
     def __str__(self) -> str:
-        return (
-            f'(P{self.current_pl_id} to move, {self.community}, '
-            f'{[p.hand for p in self._players]}, {self.pots}, '
-            f'{self.chips()})'
-        )
+        return f'(P{self.current_pl_id} to move, {self.community}, {self.pots}, {self.chips()})'
