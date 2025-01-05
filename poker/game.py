@@ -67,7 +67,7 @@ class Game:
 
         self.pl_data: List[PlayerData] = []
         self.community: List[Card] = []
-        self.pots = None
+        self.pots = Pots(range(len(self.pl_data)))
 
         self.history: GameHistory = GameHistory(self.cfg)
 
@@ -148,6 +148,7 @@ class Game:
             action, amt = self.translate_move(self.current_pl_id, action, amt)
 
             bet = None
+            reopen_betting = True
             match action:
                 case Action.FOLD:
                     for pot in self.pots:
@@ -166,8 +167,10 @@ class Game:
                 case Action.ALL_IN:
                     bet = self.current_pl_data.chips
                     self.current_pl_data.state = PlayerState.ALL_IN
-                    if bet < self.get_current_limit() / 2:
+                    if bet > self.get_current_limit() / 2:
                         self.raises_left -= 1
+                    elif self.cfg.is_limit() and bet < self.get_current_limit():
+                        reopen_betting = False
 
             if bet is not None:
                 # make everyone else call this raise
@@ -177,15 +180,20 @@ class Game:
                         if i == self.current_pl_id:
                             continue
                         if pl.state == PlayerState.MOVED:
-                            pl.state = PlayerState.TO_MOVE
+                            if reopen_betting:
+                                pl.state = PlayerState.TO_MOVE
+                            else:
+                                pl.state = PlayerState.TO_CALL
+
                 self.__bet(self.current_pl_id, bet)
 
             self.history.add_action(self.betting_stage(), self.current_pl_id, (action, amt))
 
         self.current_pl_id = self.next_player()
 
-        player_states = map(lambda p: p.state, self.pl_data)
-        if PlayerState.TO_MOVE not in player_states or self.not_folded_count() == 1:
+        pl_states = map(lambda p: p.state, self.pl_data)
+        if (PlayerState.TO_MOVE not in pl_states and PlayerState.TO_CALL not in pl_states) or \
+          self.not_folded_count() == 1:
             self.end_round()
 
     def end_round(self):
@@ -260,7 +268,7 @@ class Game:
                     self.pl_data[i].chips += remainder
 
         # clear pots
-        self.pots = None
+        self.pots = Pots(range(len(self._players)))
         self.button_id = self.next_player(self.button_id, reverse=True)
         self.state = GameState.HAND_DONE
 
@@ -378,7 +386,7 @@ class Game:
         if amt is not None and amt < 0:
             return False, f'P{pl_id}: Positive value is required for amt.'
 
-        if self.pl_data[pl_id].state != PlayerState.TO_MOVE:
+        if self.pl_data[pl_id].state not in (PlayerState.TO_MOVE, PlayerState.TO_CALL):
             return False, f'Player {pl_id} has state {self.pl_data[pl_id].state.name}, cannot move.'
 
         at_bet_limit = self.cfg.is_limit() and len(self._players) > 2 and self.raises_left <= 0
@@ -395,6 +403,10 @@ class Game:
                            f'more than available {chips} chips')
 
         if action == Action.RAISE:
+            if self.pl_data[pl_id].state == PlayerState.TO_CALL:
+                return False, (f'P{pl_id}: Betting not reopened by small all-in, '
+                                'cannot RAISE, can only CALL or FOLD.')
+
             if amt is None or amt < 0:
                 return False, f'P{pl_id}: Expected positive value for move RAISE.'
 

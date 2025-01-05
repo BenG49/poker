@@ -59,13 +59,15 @@ class PlayerState(Enum):
     '''
     Stores player's state for the current betting stage
 
-    TO_CALL: still has to call, check, or raise
+    TO_CALL: still has to call, check, raise, or fold
+    TO_MOVE: still has to call, check, or fold (NOT RAISE!)
     MOVED:   called, checked, or raised
     ALL_IN:  went all in
     FOLDED:  folded
     OUT:     either not in the current hand or out of chips
     '''
     TO_MOVE = auto()
+    TO_CALL = auto()
     MOVED = auto()
     ALL_IN = auto()
     FOLDED = auto()
@@ -73,7 +75,7 @@ class PlayerState(Enum):
 
     def active(self) -> bool:
         '''True if player will still make moves in future betting stages'''
-        return self in (PlayerState.TO_MOVE, PlayerState.MOVED)
+        return self in (PlayerState.TO_MOVE, PlayerState.TO_CALL, PlayerState.MOVED)
 
 class GameState(Enum):
     '''Poker game state'''

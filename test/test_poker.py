@@ -8,7 +8,7 @@ import random
 
 from agents import bots
 from poker import phh
-from poker.game_data import GameConfig
+from poker.game_data import GameConfig, InvalidMoveError
 from poker.hands import evaluate, Hand
 from poker.util import Card, count, same
 from poker.game import Action, Game
@@ -352,6 +352,29 @@ class TestGame(unittest.TestCase):
 
         self.assertEqual(game.chips(), [3, 4, 4])
 
+    def test_reopen_betting(self):
+        '''Test that in FL game, small all-in does not reopen raising'''
+        # two players:
+        # first player checks
+        # second player all-ins with less than small bet
+        # first player tries to raise, errors
+        game = Game(10, GameConfig(0, 0, 2, 4))
+        game.add_player()
+        game.add_player()
+        game.pl_data[-1].chips = 1
+        game.init_hand()
+        game.accept_move(Action.CALL)
+        game.accept_move(Action.ALL_IN)
+
+        good = False
+        try:
+            game.accept_move(Action.RAISE)
+        except InvalidMoveError as e:
+            if str(e).endswith(
+              'Betting not reopened by small all-in, cannot RAISE, can only CALL or FOLD.'):
+                good = True
+
+        self.assertTrue(good)
 class TestHistory(unittest.TestCase):
     def test_import_export(self):
         # pylint: disable=protected-access
