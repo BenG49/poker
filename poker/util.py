@@ -4,6 +4,7 @@ Utility classes Suit, Rank, Card, Hand
 from copy import copy
 from enum import IntEnum
 from functools import wraps
+from itertools import groupby
 from math import prod
 from random import shuffle
 from typing import Callable, List, Iterable, Tuple, Type, TypeVar
@@ -12,12 +13,9 @@ T = TypeVar('T')
 
 def same(it: Iterable) -> bool:
     '''True if all items in iterable are equal'''
-    last = None
-    for i in it:
-        if last is not None and last != i:
-            return False
-        last = i
-    return True
+    g = groupby(it)
+    # checks that there is only one group
+    return next(g, True) and not next(g, False)
 
 def count(it: Iterable) -> int:
     '''Loops through it to find length'''
